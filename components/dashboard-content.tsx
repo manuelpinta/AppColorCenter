@@ -2,68 +2,150 @@
 
 import { useState, useMemo } from "react"
 import { KPICards } from "@/components/kpi-cards"
-import { DashboardFilters } from "@/components/dashboard-filters"
-import { mockColorCenters, mockEquipos, mockEmpresas, getRegionesDisponibles } from "@/lib/mock-data"
+import { TableColumnFilter } from "@/components/table-column-filter"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { Building2, MapPin, ChevronRight, ChevronLeft, LayoutGrid, List } from "lucide-react"
+import { Input } from "@/components/ui/input"
+import { Building2, MapPin, ChevronRight, ChevronLeft, LayoutGrid, List, Search, X } from "lucide-react"
 import Link from "next/link"
+import type { ColorCenter, Empresa } from "@/lib/types"
+import type { EquipoWithEmpresa } from "@/lib/types"
+import { TableSortHeader, type SortOrder } from "@/components/table-sort-header"
 
 const ITEMS_PER_PAGE = 20
 
-export function DashboardContent() {
+interface DashboardContentProps {
+  colorCenters: ColorCenter[]
+  equipos: EquipoWithEmpresa[]
+  empresas: Empresa[]
+  regiones: string[]
+  /** Si viene de URL (ej. /gallco → emp-2), filtrar solo esta empresa al cargar. */
+  initialEmpresaId?: string
+}
+
+export function DashboardContent({
+  colorCenters,
+  equipos,
+  empresas,
+  regiones,
+  initialEmpresaId,
+}: DashboardContentProps) {
   const [searchTerm, setSearchTerm] = useState("")
-  const [empresaFilter, setEmpresaFilter] = useState("all")
-  const [regionFilter, setRegionFilter] = useState("all")
-  const [estadoFilter, setEstadoFilter] = useState("all")
   const [currentPage, setCurrentPage] = useState(1)
   const [viewMode, setViewMode] = useState<"grid" | "list">("list")
+  const validEmpresaIds = useMemo(() => new Set(empresas.map((e) => e.id)), [empresas])
+  const [filterEmpresaSet, setFilterEmpresaSet] = useState<Set<string> | null>(() =>
+    initialEmpresaId && validEmpresaIds.has(initialEmpresaId) ? new Set([initialEmpresaId]) : null
+  )
+  const [filterRegionSet, setFilterRegionSet] = useState<Set<string> | null>(null)
+  const [sortBy, setSortBy] = useState<"sucursal" | "empresa" | "region" | "equipos" | null>(null)
+  const [sortOrder, setSortOrder] = useState<SortOrder>("desc")
+  const DEFAULT_SORT_KEY = "sucursal" as const
+  const DEFAULT_SORT_ORDER: SortOrder = "asc"
 
-  const regiones = getRegionesDisponibles()
-
-  // Filtrar sucursales
+  const empresaOptions = useMemo(
+    () => empresas.map((e) => ({ value: e.id, label: e.nombre })),
+    [empresas]
+  )
+  const regionOptions = useMemo(() => {
+    const list = regiones.map((r) => ({ value: r, label: r }))
+    if (!regiones.includes("")) list.unshift({ value: "", label: "(Sin región)" })
+    return list
+  }, [regiones])
   const filteredCenters = useMemo(() => {
-    setCurrentPage(1) // Reset page when filters change
-    return mockColorCenters.filter((center) => {
-      const matchesSearch =
-        center.nombre_sucursal.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        center.codigo_interno.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        center.region?.toLowerCase().includes(searchTerm.toLowerCase())
-
-      const matchesEmpresa = empresaFilter === "all" || center.empresa_id === empresaFilter
-      const matchesRegion = regionFilter === "all" || center.region === regionFilter
-      const matchesEstado = estadoFilter === "all" || center.estado === estadoFilter
-
-      return matchesSearch && matchesEmpresa && matchesRegion && matchesEstado
+    const term = searchTerm.trim().toLowerCase()
+    if (!term) return colorCenters
+    return colorCenters.filter((center) => {
+      return (
+        center.nombre_sucursal.toLowerCase().includes(term) ||
+        center.codigo_interno.toLowerCase().includes(term) ||
+        (center.region?.toLowerCase().includes(term))
+      )
     })
-  }, [searchTerm, empresaFilter, regionFilter, estadoFilter])
+  }, [searchTerm, colorCenters])
 
-  // Paginacion
-  const totalPages = Math.ceil(filteredCenters.length / ITEMS_PER_PAGE)
+  // Filtros por columna (tipo Excel)
+  const columnFilteredCenters = useMemo(() => {
+    return filteredCenters.filter((center) => {
+      if (filterEmpresaSet !== null && !filterEmpresaSet.has(center.empresa_id)) return false
+      if (filterRegionSet !== null) {
+        if (!filterRegionSet.has(center.region ?? "")) return false
+      }
+      return true
+    })
+  }, [filteredCenters, filterEmpresaSet, filterRegionSet])
+
+  /** Ciclo: 1º click → Desc, 2º click → Asc, 3º click → Reset */
+  const handleSort = (key: string) => {
+    setSortBy((prev) => {
+      if (prev !== key) {
+        setSortOrder("desc")
+        return key as "sucursal" | "empresa" | "region" | "equipos"
+      }
+      if (sortOrder === "desc") {
+        setSortOrder("asc")
+        return key
+      }
+      setSortOrder(DEFAULT_SORT_ORDER)
+      return null
+    })
+  }
+
+  const effectiveSortKey = sortBy ?? DEFAULT_SORT_KEY
+  const effectiveSortOrder = sortBy === null ? DEFAULT_SORT_ORDER : sortOrder
+
+  const sortedCenters = useMemo(() => {
+    const getEmpresaNombre = (id: string) => empresas.find((e) => e.id === id)?.nombre ?? ""
+    const getEquiposCount = (c: ColorCenter) =>
+      equipos.filter((e) => e.empresa_id === c.empresa_id && e.color_center_id === c.id).length
+    const sorted = [...columnFilteredCenters].sort((a, b) => {
+      let cmp = 0
+      if (effectiveSortKey === "sucursal") {
+        cmp = (a.nombre_sucursal ?? "").localeCompare(b.nombre_sucursal ?? "")
+      } else if (effectiveSortKey === "empresa") {
+        cmp = getEmpresaNombre(a.empresa_id).localeCompare(getEmpresaNombre(b.empresa_id))
+      } else if (effectiveSortKey === "region") {
+        cmp = (a.region ?? "").localeCompare(b.region ?? "")
+      } else if (effectiveSortKey === "equipos") {
+        cmp = getEquiposCount(a) - getEquiposCount(b)
+      }
+      return effectiveSortOrder === "asc" ? cmp : -cmp
+    })
+    return sorted
+  }, [columnFilteredCenters, effectiveSortKey, effectiveSortOrder, empresas, equipos])
+
+  const totalPages = Math.ceil(sortedCenters.length / ITEMS_PER_PAGE)
   const paginatedCenters = useMemo(() => {
     const start = (currentPage - 1) * ITEMS_PER_PAGE
-    return filteredCenters.slice(start, start + ITEMS_PER_PAGE)
-  }, [filteredCenters, currentPage])
+    return sortedCenters.slice(start, start + ITEMS_PER_PAGE)
+  }, [sortedCenters, currentPage])
 
-  // Filtrar equipos de las sucursales filtradas
   const filteredEquipos = useMemo(() => {
-    const filteredCenterIds = new Set(filteredCenters.map((c) => c.id))
-    return mockEquipos.filter((e) => filteredCenterIds.has(e.color_center_id))
-  }, [filteredCenters])
+    return equipos.filter((e) =>
+      sortedCenters.some(
+        (c) => c.empresa_id === e.empresa_id && c.id === e.color_center_id
+      )
+    )
+  }, [sortedCenters, equipos])
 
-  // Calcular KPIs
   const kpis = useMemo(() => {
-    const totalCenters = filteredCenters.length
-    const operativos = filteredCenters.filter((cc) => cc.estado === "Operativo").length
-    const enMantenimiento = filteredCenters.filter((cc) => cc.estado === "Mantenimiento").length
-    const porcentajeOperativos = totalCenters > 0 ? Math.round((operativos / totalCenters) * 100) : 0
-
+    const totalSucursales = columnFilteredCenters.length
     const totalEquipos = filteredEquipos.length
     const equiposOperativos = filteredEquipos.filter((e) => e.estado === "Operativo").length
     const equiposEnMantenimiento = filteredEquipos.filter(
       (e) => e.estado === "Mantenimiento" || e.estado === "Fuera de Servicio"
     ).length
+    const porcentajeEquiposOperativos =
+      totalEquipos > 0 ? Math.round((equiposOperativos / totalEquipos) * 100) : 0
+
+    const equiposPorTipo = filteredEquipos.reduce(
+      (acc, e) => {
+        const t = e.tipo_equipo || "Otro"
+        acc[t] = (acc[t] || 0) + 1
+        return acc
+      },
+      {} as Record<string, number>
+    )
 
     const hoy = new Date()
     const treintaDias = new Date(hoy.getTime() + 30 * 24 * 60 * 60 * 1000)
@@ -74,57 +156,47 @@ export function DashboardContent() {
     }).length
 
     return {
-      totalCenters,
-      operativos,
-      porcentajeOperativos,
-      enMantenimiento,
+      totalSucursales,
       totalEquipos,
       equiposOperativos,
       equiposEnMantenimiento,
+      porcentajeEquiposOperativos,
+      equiposPorTipo,
       alertasVencimiento,
     }
-  }, [filteredCenters, filteredEquipos])
+  }, [sortedCenters, filteredEquipos])
 
-  const getEstadoBadgeColor = (estado: string) => {
-    switch (estado) {
-      case "Operativo":
-        return "bg-emerald-50 text-emerald-700 border-emerald-200"
-      case "Mantenimiento":
-        return "bg-amber-50 text-amber-700 border-amber-200"
-      case "Inactivo":
-        return "bg-slate-100 text-slate-600 border-slate-200"
-      default:
-        return "bg-slate-100 text-slate-600 border-slate-200"
-    }
-  }
+  const getEmpresaNombre = (empresaId: string) =>
+    empresas.find((e) => e.id === empresaId)?.nombre || ""
 
-  const getEmpresaNombre = (empresaId: string) => {
-    return mockEmpresas.find((e) => e.id === empresaId)?.nombre || ""
-  }
+  const getEquiposCount = (center: ColorCenter) =>
+    equipos.filter(
+      (e) => e.empresa_id === center.empresa_id && e.color_center_id === center.id
+    ).length
+
+  const getCenterCompositeId = (center: ColorCenter) =>
+    center.empresa_id ? `${center.empresa_id}-${center.id}` : center.id
 
   return (
     <div className="space-y-6">
       <KPICards kpis={kpis} />
 
-      <DashboardFilters
-        searchTerm={searchTerm}
-        onSearchChange={setSearchTerm}
-        empresaFilter={empresaFilter}
-        onEmpresaChange={setEmpresaFilter}
-        regionFilter={regionFilter}
-        onRegionChange={setRegionFilter}
-        estadoFilter={estadoFilter}
-        onEstadoChange={setEstadoFilter}
-        regiones={regiones}
-      />
+      <div className="relative w-full max-w-md">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+        <Input
+          placeholder="Buscar sucursal o código..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="pl-9 h-11 min-h-[44px] w-full"
+        />
+      </div>
 
-      {/* Header con conteo y toggle de vista */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <p className="text-sm text-muted-foreground">
           Mostrando <span className="font-medium text-foreground">{paginatedCenters.length}</span> de{" "}
-          <span className="font-medium text-foreground">{filteredCenters.length}</span> sucursales
+          <span className="font-medium text-foreground">{sortedCenters.length}</span> sucursales
         </p>
-        <div className="flex items-center gap-1 border rounded-lg p-1">
+        <div className="flex items-center gap-1 border rounded-lg p-1 sm:self-auto self-start">
           <Button
             variant={viewMode === "list" ? "secondary" : "ghost"}
             size="sm"
@@ -144,68 +216,174 @@ export function DashboardContent() {
         </div>
       </div>
 
-      {/* Vista de lista */}
-      {viewMode === "list" && (
-        <div className="border rounded-lg overflow-hidden bg-card">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b bg-muted/50">
-                <th className="text-left py-3 px-4 text-xs font-medium text-muted-foreground uppercase tracking-wide">Sucursal</th>
-                <th className="text-left py-3 px-4 text-xs font-medium text-muted-foreground uppercase tracking-wide hidden md:table-cell">Empresa</th>
-                <th className="text-left py-3 px-4 text-xs font-medium text-muted-foreground uppercase tracking-wide hidden lg:table-cell">Region</th>
-                <th className="text-left py-3 px-4 text-xs font-medium text-muted-foreground uppercase tracking-wide">Estado</th>
-                <th className="text-left py-3 px-4 text-xs font-medium text-muted-foreground uppercase tracking-wide hidden sm:table-cell">Equipos</th>
-                <th className="py-3 px-4"></th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {paginatedCenters.map((center) => {
-                const equiposCount = mockEquipos.filter((e) => e.color_center_id === center.id).length
-                return (
-                  <tr key={center.id} className="hover:bg-muted/30 transition-colors">
-                    <td className="py-3 px-4">
-                      <div>
-                        <p className="font-medium text-sm">{center.nombre_sucursal}</p>
-                        <p className="text-xs text-muted-foreground">{center.codigo_interno}</p>
-                      </div>
-                    </td>
-                    <td className="py-3 px-4 hidden md:table-cell">
-                      <span className="text-sm">{getEmpresaNombre(center.empresa_id)}</span>
-                    </td>
-                    <td className="py-3 px-4 hidden lg:table-cell">
-                      <span className="text-sm text-muted-foreground">{center.region || "-"}</span>
-                    </td>
-                    <td className="py-3 px-4">
-                      <Badge variant="outline" className={`${getEstadoBadgeColor(center.estado)} text-xs`}>
-                        {center.estado}
-                      </Badge>
-                    </td>
-                    <td className="py-3 px-4 hidden sm:table-cell">
-                      <span className="text-sm">{equiposCount}</span>
-                    </td>
-                    <td className="py-3 px-4 text-right">
-                      <Link href={`/sucursales/${center.id}`}>
-                        <Button variant="ghost" size="sm" className="h-8">
-                          Ver
-                          <ChevronRight className="h-4 w-4 ml-1" />
-                        </Button>
-                      </Link>
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
+      {/* Filtros activos */}
+      {(filterEmpresaSet !== null && filterEmpresaSet.size > 0) ||
+      (filterRegionSet !== null && filterRegionSet.size > 0) ? (
+        <div className="flex flex-wrap items-center gap-2 py-2 px-3 rounded-lg bg-muted/50 border border-border">
+          <span className="text-sm font-medium text-muted-foreground">Filtros activos:</span>
+          {filterEmpresaSet !== null && filterEmpresaSet.size > 0 && (
+            <span className="text-sm text-foreground">
+              Empresa:{" "}
+              {empresaOptions
+                .filter((o) => filterEmpresaSet.has(o.value))
+                .map((o) => o.label)
+                .join(", ")}
+            </span>
+          )}
+          {filterEmpresaSet !== null && filterEmpresaSet.size > 0 && filterRegionSet !== null && filterRegionSet.size > 0 && (
+            <span className="text-muted-foreground">|</span>
+          )}
+          {filterRegionSet !== null && filterRegionSet.size > 0 && (
+            <span className="text-sm text-foreground">
+              Región:{" "}
+              {regionOptions
+                .filter((o) => filterRegionSet.has(o.value))
+                .map((o) => o.label)
+                .join(", ")}
+            </span>
+          )}
+          <Button
+            variant="ghost"
+            size="sm"
+            className="ml-auto h-8 text-muted-foreground hover:text-foreground"
+            onClick={() => {
+              setFilterEmpresaSet(null)
+              setFilterRegionSet(null)
+            }}
+          >
+            <X className="h-4 w-4 mr-1" />
+            Limpiar todos
+          </Button>
         </div>
+      ) : null}
+
+      {/* Vista de lista: móvil = cards, desktop = tabla */}
+      {viewMode === "list" && (
+        <>
+          <div className="md:hidden space-y-2">
+            {paginatedCenters.map((center) => {
+              const compositeId = getCenterCompositeId(center)
+              return (
+                <Link key={compositeId} href={`/sucursales/${compositeId}`}>
+                  <Card className="border-0 shadow-sm hover:shadow-md transition-shadow active:bg-muted/30">
+                    <CardContent className="p-4 flex items-center justify-between gap-3">
+                      <div className="min-w-0 flex-1">
+                        <p className="font-medium text-foreground truncate">{center.nombre_sucursal}</p>
+                        <p className="text-xs text-muted-foreground">{center.codigo_interno}</p>
+                        <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1 text-xs text-muted-foreground">
+                          <span>{getEmpresaNombre(center.empresa_id)}</span>
+                          {center.region && <span>{center.region}</span>}
+                          <span>{getEquiposCount(center)} equipos</span>
+                        </div>
+                      </div>
+                      <ChevronRight className="h-5 w-5 text-muted-foreground shrink-0" />
+                    </CardContent>
+                  </Card>
+                </Link>
+              )
+            })}
+          </div>
+          <div className="hidden md:block border rounded-lg overflow-hidden bg-card">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b bg-muted/50 text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                  <TableSortHeader
+                    label="Sucursal"
+                    sortKey="sucursal"
+                    currentSortKey={sortBy}
+                    currentOrder={sortOrder}
+                    onSort={handleSort}
+                    className="py-3 px-4"
+                  />
+                  <TableSortHeader
+                    label="Empresa"
+                    sortKey="empresa"
+                    currentSortKey={sortBy}
+                    currentOrder={sortOrder}
+                    onSort={handleSort}
+                    className="py-3 px-4"
+                    extra={
+                      <TableColumnFilter
+                        label="Empresa"
+                        options={empresaOptions}
+                        selected={filterEmpresaSet}
+                        onSelectedChange={setFilterEmpresaSet}
+                        searchPlaceholder="Buscar empresa..."
+                      />
+                    }
+                  />
+                  <TableSortHeader
+                    label="Región"
+                    sortKey="region"
+                    currentSortKey={sortBy}
+                    currentOrder={sortOrder}
+                    onSort={handleSort}
+                    className="py-3 px-4 hidden lg:table-cell"
+                    extra={
+                      <TableColumnFilter
+                        label="Región"
+                        options={regionOptions}
+                        selected={filterRegionSet}
+                        onSelectedChange={setFilterRegionSet}
+                        searchPlaceholder="Buscar región..."
+                      />
+                    }
+                  />
+                  <TableSortHeader
+                    label="Equipos"
+                    sortKey="equipos"
+                    currentSortKey={sortBy}
+                    currentOrder={sortOrder}
+                    onSort={handleSort}
+                    className="py-3 px-4"
+                  />
+                  <th className="py-3 px-4 w-20"></th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {paginatedCenters.map((center) => {
+                  const compositeId = getCenterCompositeId(center)
+                  return (
+                    <tr key={compositeId} className="hover:bg-muted/30 transition-colors">
+                      <td className="py-3 px-4">
+                        <div>
+                          <p className="font-medium text-sm">{center.nombre_sucursal}</p>
+                          <p className="text-xs text-muted-foreground">{center.codigo_interno}</p>
+                        </div>
+                      </td>
+                      <td className="py-3 px-4">
+                        <span className="text-sm">{getEmpresaNombre(center.empresa_id)}</span>
+                      </td>
+                      <td className="py-3 px-4 hidden lg:table-cell">
+                        <span className="text-sm text-muted-foreground">{center.region || "-"}</span>
+                      </td>
+                      <td className="py-3 px-4">
+                        <span className="text-sm">{getEquiposCount(center)}</span>
+                      </td>
+                      <td className="py-3 px-4 text-right">
+                        <Link href={`/sucursales/${compositeId}`}>
+                          <Button variant="ghost" size="sm" className="h-8">
+                            Ver
+                            <ChevronRight className="h-4 w-4 ml-1" />
+                          </Button>
+                        </Link>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        </>
       )}
 
       {/* Vista de grid */}
       {viewMode === "grid" && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {paginatedCenters.map((center) => {
-            const equiposCount = mockEquipos.filter((e) => e.color_center_id === center.id).length
+            const compositeId = getCenterCompositeId(center)
             return (
-              <Card key={center.id} className="border-0 shadow-sm hover:shadow-md transition-shadow">
+              <Card key={compositeId} className="border-0 shadow-sm hover:shadow-md transition-shadow">
                 <CardContent className="p-4">
                   <div className="flex items-start justify-between gap-2 mb-3">
                     <div className="flex items-center gap-2 min-w-0">
@@ -217,9 +395,6 @@ export function DashboardContent() {
                         <p className="text-xs text-muted-foreground">{center.codigo_interno}</p>
                       </div>
                     </div>
-                    <Badge variant="outline" className={`${getEstadoBadgeColor(center.estado)} text-xs shrink-0`}>
-                      {center.estado}
-                    </Badge>
                   </div>
                   <div className="space-y-1.5 text-xs text-muted-foreground mb-3">
                     <div className="flex items-center gap-1.5">
@@ -234,8 +409,8 @@ export function DashboardContent() {
                     )}
                   </div>
                   <div className="flex items-center justify-between pt-3 border-t">
-                    <span className="text-xs text-muted-foreground">{equiposCount} equipos</span>
-                    <Link href={`/sucursales/${center.id}`}>
+                    <span className="text-xs text-muted-foreground">{getEquiposCount(center)} equipos</span>
+                    <Link href={`/sucursales/${compositeId}`}>
                       <Button variant="ghost" size="sm" className="h-7 text-xs">
                         Ver detalles
                       </Button>

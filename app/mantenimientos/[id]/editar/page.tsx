@@ -1,23 +1,29 @@
 import { notFound } from "next/navigation"
 import Link from "next/link"
 import { MantenimientoForm } from "@/components/mantenimiento-form"
-import { mockMantenimientos, mockEquipos, mockColorCenters } from "@/lib/mock-data"
+import {
+  findMantenimientoInAllBases,
+  getEquiposAllBases,
+  getColorCentersAllBases,
+} from "@/lib/data"
 import { Button } from "@/components/ui/button"
 import { ArrowLeft } from "lucide-react"
 
 export default async function EditarMantenimientoPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
+  const found = await findMantenimientoInAllBases(id)
+  if (!found) notFound()
+  const { mantenimiento } = found
 
-  const mantenimiento = mockMantenimientos.find((m) => m.id === id)
-
-  if (!mantenimiento) {
-    notFound()
-  }
+  const [equipos, colorCenters] = await Promise.all([
+    getEquiposAllBases(),
+    getColorCentersAllBases(),
+  ])
 
   return (
     <div className="px-4 py-6 lg:px-8 lg:py-8 max-w-4xl mx-auto">
       <div className="flex items-center gap-4 mb-8">
-        <Link href={`/mantenimientos/${mantenimiento.id}`}>
+        <Link href={`/mantenimientos/${id}`}>
           <Button variant="outline" size="icon" className="h-10 w-10 bg-transparent">
             <ArrowLeft className="h-4 w-4" />
           </Button>
@@ -30,7 +36,7 @@ export default async function EditarMantenimientoPage({ params }: { params: Prom
         </div>
       </div>
 
-      <MantenimientoForm equipos={mockEquipos} colorCenters={mockColorCenters} mantenimiento={mantenimiento} />
+      <MantenimientoForm equipos={equipos} colorCenters={colorCenters} mantenimiento={mantenimiento} />
     </div>
   )
 }

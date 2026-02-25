@@ -1,20 +1,22 @@
 import { notFound } from "next/navigation"
 import Link from "next/link"
-import { mockMantenimientos, mockEquipos, mockColorCenters } from "@/lib/mock-data"
+import {
+  findMantenimientoInAllBases,
+  getEquipoById,
+  getSucursalesByEmpresa,
+} from "@/lib/data"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
   ArrowLeft,
   Edit,
-  Calendar,
   User,
   Wrench,
   FileText,
   Building2,
   Clock,
   CheckCircle2,
-  AlertCircle,
   Timer,
   DollarSign,
   Package,
@@ -22,15 +24,18 @@ import {
 
 export default async function DetalleMantenimientoPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
+  const found = await findMantenimientoInAllBases(id)
+  if (!found) notFound()
+  const { mantenimiento, pool, empresaId } = found
 
-  const mantenimiento = mockMantenimientos.find((m) => m.id === id)
-
-  if (!mantenimiento) {
-    notFound()
-  }
-
-  const equipo = mockEquipos.find((e) => e.id === mantenimiento.equipo_id)
-  const colorCenter = equipo ? mockColorCenters.find((c) => c.id === equipo.color_center_id) : null
+  const [equipo, sucursales] = await Promise.all([
+    getEquipoById(pool, mantenimiento.equipo_id),
+    getSucursalesByEmpresa(empresaId),
+  ])
+  const colorCenter = equipo
+    ? sucursales.find((c) => c.id === equipo.color_center_id)
+    : null
+  const equipoIdForLink = equipo ? `${empresaId}-${equipo.id}` : null
 
   const getEstadoBadgeColor = (estado: string) => {
     switch (estado) {
@@ -58,242 +63,150 @@ export default async function DetalleMantenimientoPage({ params }: { params: Pro
     }
   }
 
-  const getTipoBadgeColor = (tipo: string) => {
-    switch (tipo) {
-      case "Preventivo":
-        return "bg-blue-50 text-blue-700 border-blue-200"
-      case "Correctivo":
-        return "bg-rose-50 text-rose-700 border-rose-200"
-      default:
-        return "bg-slate-50 text-slate-600 border-slate-200"
-    }
-  }
-
   return (
-    <div className="px-4 py-6 lg:px-8 lg:py-8 max-w-5xl mx-auto">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
-        <div className="flex items-center gap-4">
-          <Link href="/mantenimientos">
-            <Button variant="outline" size="icon" className="h-10 w-10 bg-transparent">
-              <ArrowLeft className="h-4 w-4" />
+    <div className="pb-20 lg:pb-0">
+      <div className="px-4 py-6 lg:px-8 lg:py-8 max-w-4xl mx-auto">
+        <Link
+          href="/mantenimientos"
+          className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground mb-6"
+        >
+          <ArrowLeft className="h-4 w-4 mr-1" />
+          Volver a Mantenimientos
+        </Link>
+
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-primary/10 border border-primary/20">
+              {getEstadoIcon(mantenimiento.estado)}
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold text-foreground">
+                Mantenimiento {mantenimiento.tipo} #{id}
+              </h1>
+              <p className="text-sm text-muted-foreground">
+                {new Date(mantenimiento.fecha_mantenimiento).toLocaleDateString("es-ES", {
+                  weekday: "long",
+                  year: "numeric",
+                  month: "long",
+                  day: "numeric",
+                })}
+              </p>
+            </div>
+          </div>
+          <Link href={`/mantenimientos/${id}/editar`}>
+            <Button variant="outline" size="sm">
+              <Edit className="h-4 w-4 mr-2" />
+              Editar
             </Button>
           </Link>
-          <div>
-            <h1 className="text-2xl lg:text-3xl font-bold text-foreground tracking-tight">
-              Detalle del Mantenimiento
-            </h1>
-            <p className="text-sm text-muted-foreground mt-1">ID: {mantenimiento.id}</p>
-          </div>
         </div>
-        <Link href={`/mantenimientos/${mantenimiento.id}/editar`}>
-          <Button className="gap-2">
-            <Edit className="h-4 w-4" />
-            Editar
-          </Button>
-        </Link>
-      </div>
 
-      <div className="grid gap-6 lg:grid-cols-3">
-        {/* Main Info */}
-        <div className="lg:col-span-2 space-y-6">
-          {/* Estado y Tipo */}
-          <Card className="border-0 shadow-sm">
-            <CardHeader className="pb-4">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-lg">Estado del Mantenimiento</CardTitle>
-                <div className="flex items-center gap-2">
-                  {getEstadoIcon(mantenimiento.estado)}
-                  <Badge variant="outline" className={getEstadoBadgeColor(mantenimiento.estado)}>
-                    {mantenimiento.estado}
-                  </Badge>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
-                  <Wrench className="h-5 w-5 text-primary/60" />
-                  <div>
-                    <p className="text-xs text-muted-foreground">Tipo</p>
-                    <Badge variant="outline" className={`mt-1 ${getTipoBadgeColor(mantenimiento.tipo)}`}>
-                      {mantenimiento.tipo}
-                    </Badge>
+        <div className="grid gap-6 lg:grid-cols-3">
+          <div className="lg:col-span-2 space-y-6">
+            <Card className="border-0 shadow-sm">
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <FileText className="h-5 w-5" />
+                  Descripción
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-foreground whitespace-pre-wrap">{mantenimiento.descripcion}</p>
+                {mantenimiento.piezas_cambiadas && (
+                  <div className="mt-4 pt-4 border-t border-border">
+                    <p className="text-sm text-muted-foreground font-medium flex items-center gap-1.5">
+                      <Package className="h-4 w-4" />
+                      Piezas cambiadas
+                    </p>
+                    <p className="text-sm text-foreground mt-1 whitespace-pre-wrap">
+                      {mantenimiento.piezas_cambiadas}
+                    </p>
                   </div>
-                </div>
-                <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
-                  <Calendar className="h-5 w-5 text-primary/60" />
+                )}
+                {mantenimiento.notas && (
+                  <div className="mt-4 pt-4 border-t border-border">
+                    <p className="text-sm text-muted-foreground font-medium">Notas</p>
+                    <p className="text-sm text-foreground mt-1 whitespace-pre-wrap">{mantenimiento.notas}</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="space-y-6">
+            <Card className="border-0 shadow-sm">
+              <CardHeader>
+                <CardTitle className="text-lg">Contexto</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-start gap-3">
+                  <Wrench className="h-5 w-5 text-primary/60 mt-0.5" />
                   <div>
-                    <p className="text-xs text-muted-foreground">Fecha</p>
+                    <p className="text-sm text-muted-foreground">Realizado por</p>
                     <p className="font-medium">
-                      {new Date(mantenimiento.fecha_mantenimiento).toLocaleDateString("es-ES", {
-                        year: "numeric",
-                        month: "long",
-                        day: "numeric",
-                      })}
+                      {mantenimiento.realizado_por === "Externo" ? "Externo" : "Interno"}
+                      {mantenimiento.realizado_por === "Interno" && mantenimiento.tecnico_responsable && (
+                        <span className="text-muted-foreground font-normal"> · {mantenimiento.tecnico_responsable}</span>
+                      )}
                     </p>
                   </div>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Descripcion */}
-          <Card className="border-0 shadow-sm">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-lg flex items-center gap-2">
-                <FileText className="h-5 w-5 text-primary/60" />
-                Descripcion
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-muted-foreground leading-relaxed">{mantenimiento.descripcion}</p>
-            </CardContent>
-          </Card>
-
-          {/* Tecnico */}
-          <Card className="border-0 shadow-sm">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-lg flex items-center gap-2">
-                <User className="h-5 w-5 text-primary/60" />
-                Tecnico Responsable
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
-                  <User className="h-5 w-5 text-primary" />
-                </div>
-                <div>
-                  <p className="font-medium">{mantenimiento.tecnico_responsable}</p>
-                  <p className="text-sm text-muted-foreground">Tecnico de mantenimiento</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Piezas Cambiadas */}
-          {mantenimiento.piezas_cambiadas && (
-            <Card className="border-0 shadow-sm">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <Package className="h-5 w-5 text-primary/60" />
-                  Piezas Cambiadas
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-muted-foreground leading-relaxed">{mantenimiento.piezas_cambiadas}</p>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Notas */}
-          {mantenimiento.notas && (
-            <Card className="border-0 shadow-sm">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-lg">Notas</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-muted-foreground leading-relaxed">{mantenimiento.notas}</p>
-              </CardContent>
-            </Card>
-          )}
-        </div>
-
-        {/* Sidebar */}
-        <div className="space-y-6">
-          {/* Equipo Info */}
-          {equipo && (
-            <Card className="border-0 shadow-sm">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <Wrench className="h-5 w-5 text-primary/60" />
-                  Equipo
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div>
-                  <p className="text-sm text-muted-foreground">Tipo</p>
-                  <p className="font-medium">{equipo.tipo_equipo}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Marca / Modelo</p>
-                  <p className="font-medium">{equipo.marca} {equipo.modelo}</p>
-                </div>
-                {equipo.numero_serie && (
-                  <div>
-                    <p className="text-sm text-muted-foreground">Numero de Serie</p>
-                    <p className="font-medium font-mono text-sm">{equipo.numero_serie}</p>
+                {equipo && equipoIdForLink && (
+                  <>
+                    <div className="flex items-start gap-3">
+                      <Wrench className="h-5 w-5 text-primary/60 mt-0.5" />
+                      <div>
+                        <p className="text-sm text-muted-foreground">Equipo</p>
+                        <Link
+                          href={`/equipos/${equipoIdForLink}`}
+                          className="font-medium text-primary hover:underline"
+                        >
+                          {equipo.tipo_equipo} {equipo.marca && `- ${equipo.marca}`}
+                        </Link>
+                        {equipo.numero_serie && (
+                          <p className="text-xs text-muted-foreground">{equipo.numero_serie}</p>
+                        )}
+                      </div>
+                    </div>
+                    {colorCenter && (
+                      <div className="flex items-start gap-3">
+                        <Building2 className="h-5 w-5 text-primary/60 mt-0.5" />
+                        <div>
+                          <p className="text-sm text-muted-foreground">Sucursal</p>
+                          <p className="font-medium">{colorCenter.nombre_sucursal}</p>
+                          <p className="text-xs text-muted-foreground">{colorCenter.codigo_interno}</p>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+                {(mantenimiento.tiempo_fuera_servicio != null || mantenimiento.costo != null) && (
+                  <div className="flex flex-wrap gap-4 pt-2">
+                    {mantenimiento.tiempo_fuera_servicio != null && (
+                      <div className="flex items-center gap-1.5 text-sm">
+                        <Clock className="h-4 w-4 text-muted-foreground" />
+                        <span>{mantenimiento.tiempo_fuera_servicio}h fuera de servicio</span>
+                      </div>
+                    )}
+                    {mantenimiento.costo != null && (
+                      <div className="flex items-center gap-1.5 text-sm">
+                        <DollarSign className="h-4 w-4 text-muted-foreground" />
+                        <span>${mantenimiento.costo.toLocaleString()}</span>
+                      </div>
+                    )}
                   </div>
                 )}
-                <Link href={`/equipos/${equipo.id}`}>
-                  <Button variant="outline" className="w-full mt-2 bg-transparent">
-                    Ver Equipo
-                  </Button>
-                </Link>
               </CardContent>
             </Card>
-          )}
 
-          {/* Color Center Info */}
-          {colorCenter && (
             <Card className="border-0 shadow-sm">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <Building2 className="h-5 w-5 text-primary/60" />
-                  Color Center
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div>
-                  <p className="text-sm text-muted-foreground">Sucursal</p>
-                  <p className="font-medium">{colorCenter.nombre_sucursal}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Codigo</p>
-                  <p className="font-medium">{colorCenter.codigo_interno}</p>
-                </div>
-                {colorCenter.region && (
-                  <div>
-                    <p className="text-sm text-muted-foreground">Region</p>
-                    <p className="font-medium">{colorCenter.region}</p>
-                  </div>
-                )}
-                <Link href={`/sucursales/${colorCenter.id}`}>
-                  <Button variant="outline" className="w-full mt-2 bg-transparent">
-                    Ver Sucursal
-                  </Button>
-                </Link>
+              <CardContent className="pt-6">
+                <Badge className={`${getEstadoBadgeColor(mantenimiento.estado)} text-sm px-3 py-1`}>
+                  {mantenimiento.estado}
+                </Badge>
               </CardContent>
             </Card>
-          )}
-
-          {/* Costos y Tiempo */}
-          <Card className="border-0 shadow-sm">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-lg flex items-center gap-2">
-                <DollarSign className="h-5 w-5 text-primary/60" />
-                Costos y Tiempo
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {mantenimiento.costo !== null && (
-                <div>
-                  <p className="text-sm text-muted-foreground">Costo</p>
-                  <p className="font-medium text-lg">${mantenimiento.costo.toLocaleString("es-MX")}</p>
-                </div>
-              )}
-              {mantenimiento.tiempo_fuera_servicio !== null && (
-                <div>
-                  <p className="text-sm text-muted-foreground">Tiempo fuera de servicio</p>
-                  <p className="font-medium">{mantenimiento.tiempo_fuera_servicio} horas</p>
-                </div>
-              )}
-              {mantenimiento.costo === null && mantenimiento.tiempo_fuera_servicio === null && (
-                <p className="text-sm text-muted-foreground">No registrado</p>
-              )}
-            </CardContent>
-          </Card>
+          </div>
         </div>
       </div>
     </div>

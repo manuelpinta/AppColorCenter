@@ -103,6 +103,25 @@ Documento de diseño y criterios de manejo de la información. Sirve como refere
 
 ---
 
+## 6. Fotos de equipos (Supabase Storage)
+
+**Contexto:** La app usará **MySQL** como base de datos principal. Las **imágenes de los equipos** se almacenarán en **Supabase Storage** para no guardar binarios en MySQL y aprovechar CDN y control de acceso.
+
+**Qué debe quedar claro:**
+
+- **Varias fotos por equipo:** No es una sola “foto de perfil”, sino una **galería** para documentar el estado del equipo (vistas por todos los lados). Cada foto debe tener **fecha** (cuándo se tomó) y opcionalmente descripción (ej. "Vista frontal", "Lateral derecho").
+- **Dónde se guarda:** Archivos en Supabase Storage (bucket `equipos-fotos`). En MySQL, tabla **`equipo_fotos`** con `equipo_id`, `url`, `fecha_foto`, `descripcion` (una fila por foto).
+- **Flujo:** (1) Usuario sube una o más fotos desde el detalle del equipo. (2) La app sube cada archivo a Supabase Storage. (3) Se guarda en `equipo_fotos` la URL y la fecha (y descripción). (4) En el detalle del equipo se muestra la galería ordenada por fecha.
+
+**Criterios de manejo:**
+
+- MySQL no almacena el binario; la tabla `equipo_fotos` guarda solo la URL (o path) de cada imagen en Supabase.
+- Cada foto tiene **fecha_foto** obligatoria para saber de cuándo es y poder ver evolución del estado.
+- Configuración: variables de entorno para Supabase; bucket con política de acceso según necesidad.
+- Al dar de baja un equipo, decidir si se borran también los archivos en Storage (opcional).
+
+---
+
 ## Resumen por proceso (alineado al diagrama)
 
 | Proceso / tema           | Objetivo de información                                      |
@@ -114,6 +133,7 @@ Documento de diseño y criterios de manejo de la información. Sirve como refere
 | **Reporte incidencias**  | Entidad distinta a mantenimiento; dispara alertas.           |
 | **Renovación (arrendamiento)** | Fecha vencimiento, estado, historial para decidir renovar. |
 | **Deshuesadero**         | Equipos y piezas en refacciones; condición y control de bajas. |
+| **Fotos de equipos**     | Varias fotos por equipo (galería con fecha); Supabase Storage + tabla `equipo_fotos` en MySQL. |
 
 ---
 
@@ -126,8 +146,9 @@ Documento de diseño y criterios de manejo de la información. Sirve como refere
 
 ## Próximos pasos (cuando se programe)
 
-1. Modelo de datos: tablas o campos para movimientos, incidencias, alertas, vencimiento de arrendamiento, deshuesadero y piezas.
-2. Flujos de pantalla: alta de incidencia → asignación de responsables → alertas; consulta de historial de movimientos; reportes de costo por equipo; vista de arrendamientos por vencer; alta y seguimiento de piezas en deshuesadero.
-3. Definir reglas de negocio: quién puede reportar incidencias, quién puede dar de baja equipos, quién registra piezas extraídas, etc.
+1. Modelo de datos: tablas o campos para movimientos, incidencias, alertas, vencimiento de arrendamiento, deshuesadero y piezas; y uso de `foto_url` en equipos para Supabase Storage.
+2. Fotos de equipos: galería con tabla `equipo_fotos` (url, fecha_foto, descripcion); integración con Supabase Storage para subir archivos y guardar URL.
+3. Flujos de pantalla: alta de incidencia → asignación de responsables → alertas; consulta de historial de movimientos; reportes de costo por equipo; vista de arrendamientos por vencer; alta y seguimiento de piezas en deshuesadero.
+4. Definir reglas de negocio: quién puede reportar incidencias, quién puede dar de baja equipos, quién registra piezas extraídas, etc.
 
 Este documento se puede ir actualizando con decisiones concretas (nombres de tablas, estados, roles) sin tocar código hasta que se decida implementar cada parte.

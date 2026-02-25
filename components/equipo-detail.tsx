@@ -96,7 +96,13 @@ export function EquipoDetail({ equipo, colorCenter, mantenimientos }: EquipoDeta
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-4">
-          <Link href={`/sucursales/${colorCenter.id}`}>
+          <Link
+            href={
+              colorCenter && equipo.empresa_id
+                ? `/sucursales/${buildSucursalCompositeIdFromIds(equipo.empresa_id as any, colorCenter.id)}`
+                : `/sucursales/${colorCenter ? colorCenter.id : ""}`
+            }
+          >
             <Button variant="outline" size="icon" className="bg-transparent">
               <ArrowLeft className="h-4 w-4" />
             </Button>
@@ -166,6 +172,16 @@ export function EquipoDetail({ equipo, colorCenter, mantenimientos }: EquipoDeta
                     ? `En arrendamiento - ${equipo.arrendador}`
                     : "Propiedad nuestra"}
                 </p>
+                {equipo.tipo_propiedad === "Arrendado" && equipo.fecha_vencimiento_arrendamiento && (
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Vencimiento contrato:{" "}
+                    {new Date(equipo.fecha_vencimiento_arrendamiento).toLocaleDateString("es-ES", {
+                      year: "numeric",
+                      month: "short",
+                      day: "numeric",
+                    })}
+                  </p>
+                )}
               </div>
               {equipo.fecha_compra && (
                 <div className="space-y-1">
@@ -243,12 +259,6 @@ export function EquipoDetail({ equipo, colorCenter, mantenimientos }: EquipoDeta
                 <p className="font-medium">{colorCenter.region}</p>
               </div>
             )}
-            {colorCenter.responsable && (
-              <div className="space-y-1">
-                <p className="text-sm text-muted-foreground">Responsable</p>
-                <p className="font-medium">{colorCenter.responsable}</p>
-              </div>
-            )}
           </CardContent>
         </Card>
       </div>
@@ -302,8 +312,11 @@ export function EquipoDetail({ equipo, colorCenter, mantenimientos }: EquipoDeta
                       
                       <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
                         <span className="flex items-center gap-1">
-                          <User className="h-3.5 w-3.5" />
-                          {mantenimiento.tecnico_responsable}
+                          <WrenchIcon className="h-3.5 w-3.5" />
+                          {mantenimiento.realizado_por === "Externo" ? "Externo" : "Interno"}
+                          {mantenimiento.realizado_por === "Interno" && mantenimiento.tecnico_responsable && (
+                            <> · {mantenimiento.tecnico_responsable}</>
+                          )}
                         </span>
                         {mantenimiento.tiempo_fuera_servicio && (
                           <span className="flex items-center gap-1">

@@ -5,7 +5,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { TrendingUp, AlertTriangle, CheckCircle2, FileSpreadsheet } from "lucide-react"
-import { mockColorCenters, mockEquipos, mockMantenimientos } from "@/lib/mock-data"
+import type { ColorCenter } from "@/lib/types"
+import type { EquipoWithEmpresa, MantenimientoWithEmpresa } from "@/lib/types"
 import {
   BarChart,
   Bar,
@@ -24,7 +25,21 @@ import {
 
 const COLORS = ["#2563eb", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6"]
 
-export function ReportesContent() {
+const MESES = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"]
+
+interface ReportesContentProps {
+  colorCenters: ColorCenter[]
+  equipos: EquipoWithEmpresa[]
+  mantenimientos: MantenimientoWithEmpresa[]
+  regiones: string[]
+}
+
+export function ReportesContent({
+  colorCenters,
+  equipos,
+  mantenimientos,
+  regiones,
+}: ReportesContentProps) {
   const [periodo, setPeriodo] = useState("mes")
   const [region, setRegion] = useState("todas")
   const [tipoEquipo, setTipoEquipo] = useState("todos")
@@ -32,98 +47,131 @@ export function ReportesContent() {
   const [stats, setStats] = useState<any>(null)
 
   useEffect(() => {
-    loadReportData()
-  }, [periodo, region, tipoEquipo])
-
-  async function loadReportData() {
     setLoading(true)
-    calculateStats(mockColorCenters, mockEquipos, mockMantenimientos)
-  }
+    const centersFiltered =
+      region === "todas"
+        ? colorCenters
+        : colorCenters.filter((c) => (c.region ?? "") === region)
+    const centerIds = new Set(centersFiltered.map((c) => (c.empresa_id ? `${c.empresa_id}-${c.id}` : c.id)))
+    const equiposFiltered = equipos.filter((eq) => {
+      if (!centerIds.has(`${eq.empresa_id}-${eq.color_center_id}`)) return false
+      if (tipoEquipo !== "todos" && (eq.tipo_equipo || "") !== tipoEquipo) return false
+      return true
+    })
+    const equipoIds = new Set(equiposFiltered.map((e) => e.id))
+    const mantenimientosFiltered = mantenimientos.filter((m) =>
+      equipoIds.has(`${m.empresa_id}-${m.equipo_id}`)
+    )
+    calculateStats(centersFiltered, equiposFiltered, mantenimientosFiltered)
+  }, [periodo, region, tipoEquipo, colorCenters, equipos, mantenimientos])
 
-  function calculateStats(centers: any[], equipos: any[], mantenimientos: any[]) {
-    const totalCenters = centers?.length || 0
-    const totalEquipos = equipos?.length || 0
-    const totalMantenimientos = mantenimientos?.length || 0
+  function calculateStats(
+    centers: ColorCenter[],
+    equiposFilt: EquipoWithEmpresa[],
+    mantenimientosFilt: MantenimientoWithEmpresa[]
+  ) {
+    const totalSucursales = centers.length
+    const totalEquipos = equiposFilt.length
+    const totalMantenimientos = mantenimientosFilt.length
 
-    const operativos = centers?.filter((c) => c.estado === "Operativo").length || 0
-    const porcentajeOperativo = totalCenters > 0 ? Math.round((operativos / totalCenters) * 100) : 0
+    const sucursalesOperativas = centers.filter((c) => c.estado === "Operativo").length
+    const porcentajeOperativo =
+      totalSucursales > 0 ? Math.round((sucursalesOperativas / totalSucursales) * 100) : 0
 
-    const tiempoPromedioRespuesta = 4.5
-    const costoTotal = mantenimientos?.reduce((sum, m) => sum + (m.costo || 0), 0) || 0
+    const conTiempo = mantenimientosFilt.filter((m) => m.tiempo_fuera_servicio != null && m.tiempo_fuera_servicio > 0)
+    const tiempoPromedioFueraServicio =
+      conTiempo.length > 0
+        ? conTiempo.reduce((s, m) => s + (m.tiempo_fuera_servicio ?? 0), 0) / conTiempo.length
+        : null
+    const costoTotal = mantenimientosFilt.reduce((sum, m) => sum + (m.costo || 0), 0)
 
-    const equiposPorTipo = equipos?.reduce((acc: any, eq: any) => {
-      const tipo = eq.tipo_equipo || eq.tipo || "Otro"
+    const equiposPorTipo = equiposFilt.reduce((acc: Record<string, number>, eq) => {
+      const tipo = eq.tipo_equipo || "Otro"
       acc[tipo] = (acc[tipo] || 0) + 1
       return acc
     }, {})
 
-    const equiposPorTipoData = Object.entries(equiposPorTipo || {}).map(([name, value]) => ({
-      name,
-      value,
+    const equiposPorTipoData = Object.entries(equiposPorTipo).map(([name, value]) => ({ name, value }))
+
+    const byMonth: Record<
+      number,
+      { preventivo: number; correctivo: number; costo: number }
+    > = {}
+    for (let i = 0; i < 12; i++) byMonth[i] = { preventivo: 0, correctivo: 0, costo: 0 }
+    for (const m of mantenimientosFilt) {
+      const fecha = m.fecha_mantenimiento ? new Date(m.fecha_mantenimiento) : null
+      if (!fecha || isNaN(fecha.getTime())) continue
+      const month = fecha.getMonth()
+      if (m.tipo === "Preventivo") byMonth[month].preventivo += 1
+      else byMonth[month].correctivo += 1
+      byMonth[month].costo += m.costo || 0
+    }
+    const mantenimientosPorMes = MESES.map((mes, i) => ({
+      mes,
+      preventivo: byMonth[i].preventivo,
+      correctivo: byMonth[i].correctivo,
     }))
+    const costosPorMes = MESES.map((mes, i) => ({ mes, costo: byMonth[i].costo }))
 
-    const mantenimientosPorMes = [
-      { mes: "May", preventivo: 12, correctivo: 5 },
-      { mes: "Jun", preventivo: 15, correctivo: 8 },
-      { mes: "Jul", preventivo: 18, correctivo: 6 },
-      { mes: "Ago", preventivo: 14, correctivo: 9 },
-      { mes: "Sep", preventivo: 20, correctivo: 7 },
-      { mes: "Oct", preventivo: 16, correctivo: 4 },
-    ]
-
-    const costosPorMes = [
-      { mes: "May", costo: 45000 },
-      { mes: "Jun", costo: 52000 },
-      { mes: "Jul", costo: 48000 },
-      { mes: "Ago", costo: 61000 },
-      { mes: "Sep", costo: 55000 },
-      { mes: "Oct", costo: 43000 },
-    ]
-
-    const equiposPorEstado = equipos?.reduce((acc: any, eq: any) => {
-      acc[eq.estado] = (acc[eq.estado] || 0) + 1
+    const equiposPorEstado = equiposFilt.reduce((acc: Record<string, number>, eq) => {
+      const e = eq.estado || "Otro"
+      acc[e] = (acc[e] || 0) + 1
       return acc
     }, {})
-
-    const equiposPorEstadoData = Object.entries(equiposPorEstado || {}).map(([name, value]) => ({
-      name: name === "Operativo" ? "Operativo" : name === "Mantenimiento" ? "Mantenimiento" : "Fuera de Servicio",
+    const equiposPorEstadoData = Object.entries(equiposPorEstado).map(([name, value]) => ({
+      name: name === "Operativo" ? "Operativo" : name === "Mantenimiento" ? "Mantenimiento" : name === "Fuera de Servicio" ? "Fuera de Servicio" : name,
       value,
     }))
 
-    const equiposProblematicos = [
-      { equipo: "Dispensador CM-5000X", mantenimientos: 8 },
-      { equipo: "Agitador SM-250", mantenimientos: 6 },
-      { equipo: "Espectrofotómetro CS-200", mantenimientos: 5 },
-      { equipo: "Dispensador AC-2500", mantenimientos: 4 },
-      { equipo: "Agitador SM-300", mantenimientos: 3 },
-    ]
+    const countByEquipo: Record<string, number> = {}
+    for (const m of mantenimientosFilt) {
+      const key = `${m.empresa_id}-${m.equipo_id}`
+      countByEquipo[key] = (countByEquipo[key] || 0) + 1
+    }
+    const equiposProblematicos = Object.entries(countByEquipo)
+      .sort(([, a], [, b]) => b - a)
+      .slice(0, 5)
+      .map(([key, count]) => {
+        const eq = equiposFilt.find((e) => e.id === key)
+        const label = eq
+          ? [eq.tipo_equipo, eq.marca, eq.modelo].filter(Boolean).join(" ") || eq.id
+          : key
+        return { equipo: label, mantenimientos: count }
+      })
+
+    const pendientes = mantenimientosFilt.filter(
+      (m) => m.estado === "Pendiente" || m.estado === "En Proceso"
+    ).length
 
     setStats({
-      totalCenters,
+      totalSucursales,
+      sucursalesOperativas,
       totalEquipos,
       totalMantenimientos,
       porcentajeOperativo,
-      tiempoPromedioRespuesta,
+      tiempoPromedioFueraServicio,
       costoTotal,
       equiposPorTipoData,
       mantenimientosPorMes,
       costosPorMes,
       equiposPorEstadoData,
       equiposProblematicos,
+      pendientes,
     })
     setLoading(false)
   }
 
-  async function exportarExcel() {
+  function exportarExcel() {
+    if (!stats) return
     const csvContent = [
-      ["Reporte de Color Centers"],
+      ["Reporte de Sucursales y Equipos"],
       [""],
       ["Métrica", "Valor"],
-      ["Total Color Centers", stats.totalCenters],
-      ["% Operativo", `${stats.porcentajeOperativo}%`],
+      ["Total Sucursales", stats.totalSucursales],
+      ["% Operativo (sucursales)", `${stats.porcentajeOperativo}%`],
       ["Total Equipos", stats.totalEquipos],
       ["Total Mantenimientos", stats.totalMantenimientos],
-      ["Tiempo Promedio Respuesta", `${stats.tiempoPromedioRespuesta} horas`],
+      ["Tiempo prom. fuera de servicio (h)", stats.tiempoPromedioFueraServicio != null ? `${stats.tiempoPromedioFueraServicio.toFixed(1)} h` : "—"],
       ["Costo Total", `$${stats.costoTotal.toLocaleString()}`],
     ]
       .map((row) => row.join(","))
@@ -133,14 +181,14 @@ export function ReportesContent() {
     const link = document.createElement("a")
     const url = URL.createObjectURL(blob)
     link.setAttribute("href", url)
-    link.setAttribute("download", `reporte-color-centers-${new Date().toISOString().split("T")[0]}.csv`)
+    link.setAttribute("download", `reporte-sucursales-${new Date().toISOString().split("T")[0]}.csv`)
     link.style.visibility = "hidden"
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)
   }
 
-  if (loading) {
+  if (loading || !stats) {
     return <div className="p-4 lg:p-6">Cargando reportes...</div>
   }
 
@@ -172,10 +220,14 @@ export function ReportesContent() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="todas">Todas las regiones</SelectItem>
-              <SelectItem value="norte">Norte</SelectItem>
-              <SelectItem value="sur">Sur</SelectItem>
-              <SelectItem value="centro">Centro</SelectItem>
-              <SelectItem value="occidente">Occidente</SelectItem>
+              {regiones.map((r) => (
+                <SelectItem key={r} value={r}>
+                  {r}
+                </SelectItem>
+              ))}
+              {colorCenters.some((c) => !c.region) && (
+                <SelectItem value="">Sin región</SelectItem>
+              )}
             </SelectContent>
           </Select>
 
@@ -184,11 +236,12 @@ export function ReportesContent() {
               <SelectValue placeholder="Tipo de equipo" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="todos">Todos los equipos</SelectItem>
-              <SelectItem value="tintometro">Tintómetro</SelectItem>
-              <SelectItem value="agitador">Agitador</SelectItem>
-              <SelectItem value="dispensador">Dispensador</SelectItem>
-              <SelectItem value="balanza">Balanza</SelectItem>
+              <SelectItem value="todos">Todos los tipos</SelectItem>
+              {Array.from(new Set(equipos.map((e) => e.tipo_equipo).filter(Boolean))).sort().map((t) => (
+                <SelectItem key={t} value={t}>
+                  {t}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
 
@@ -203,26 +256,26 @@ export function ReportesContent() {
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 lg:gap-4">
         <Card>
           <CardHeader className="pb-2 lg:pb-3">
-            <CardDescription className="text-xs lg:text-sm">Total Color Centers</CardDescription>
-            <CardTitle className="text-xl lg:text-3xl">{stats.totalCenters}</CardTitle>
+            <CardDescription className="text-xs lg:text-sm">Total Sucursales</CardDescription>
+            <CardTitle className="text-xl lg:text-3xl">{stats.totalSucursales}</CardTitle>
           </CardHeader>
           <CardContent className="pb-3 lg:pb-4">
-            <div className="flex items-center text-xs lg:text-sm text-success">
+            <div className="flex items-center text-xs lg:text-sm text-primary">
               <TrendingUp className="h-3 w-3 lg:h-4 lg:w-4 mr-1" />
-              <span>+2 este mes</span>
+              <span>{stats.sucursalesOperativas} operativas</span>
             </div>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="pb-2 lg:pb-3">
-            <CardDescription className="text-xs lg:text-sm">% Operativo</CardDescription>
+            <CardDescription className="text-xs lg:text-sm">% Operativo (sucursales)</CardDescription>
             <CardTitle className="text-xl lg:text-3xl">{stats.porcentajeOperativo}%</CardTitle>
           </CardHeader>
           <CardContent className="pb-3 lg:pb-4">
             <div className="flex items-center text-xs lg:text-sm text-success">
               <CheckCircle2 className="h-3 w-3 lg:h-4 lg:w-4 mr-1" />
-              <span>Excelente</span>
+              <span>{stats.totalSucursales > 0 ? "Sucursales en operación" : "Sin datos"}</span>
             </div>
           </CardContent>
         </Card>
@@ -233,10 +286,7 @@ export function ReportesContent() {
             <CardTitle className="text-xl lg:text-3xl">{stats.totalEquipos}</CardTitle>
           </CardHeader>
           <CardContent className="pb-3 lg:pb-4">
-            <div className="flex items-center text-xs lg:text-sm text-muted-foreground">
-              <TrendingUp className="h-3 w-3 lg:h-4 lg:w-4 mr-1" />
-              <span>+5 este mes</span>
-            </div>
+            <p className="text-xs lg:text-sm text-muted-foreground">Según filtros aplicados</p>
           </CardContent>
         </Card>
 
@@ -248,18 +298,20 @@ export function ReportesContent() {
           <CardContent className="pb-3 lg:pb-4">
             <div className="flex items-center text-xs lg:text-sm text-warning">
               <AlertTriangle className="h-3 w-3 lg:h-4 lg:w-4 mr-1" />
-              <span>3 pendientes</span>
+              <span>{stats.pendientes} pendientes / en proceso</span>
             </div>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="pb-2 lg:pb-3">
-            <CardDescription className="text-xs lg:text-sm">Tiempo Promedio</CardDescription>
-            <CardTitle className="text-xl lg:text-3xl">{stats.tiempoPromedioRespuesta}h</CardTitle>
+            <CardDescription className="text-xs lg:text-sm">Tiempo prom. fuera de servicio</CardDescription>
+            <CardTitle className="text-xl lg:text-3xl">
+              {stats.tiempoPromedioFueraServicio != null ? `${stats.tiempoPromedioFueraServicio.toFixed(1)} h` : "—"}
+            </CardTitle>
           </CardHeader>
           <CardContent className="pb-3 lg:pb-4">
-            <p className="text-xs lg:text-sm text-muted-foreground">Respuesta a fallas</p>
+            <p className="text-xs lg:text-sm text-muted-foreground">Horas (mantenimientos con dato)</p>
           </CardContent>
         </Card>
 

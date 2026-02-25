@@ -3,9 +3,10 @@
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Search, Building2, MapPin, Filter } from "lucide-react"
-import { mockEmpresas } from "@/lib/mock-data"
+import type { Empresa } from "@/lib/types"
 
 interface DashboardFiltersProps {
+  empresas: Empresa[]
   searchTerm: string
   onSearchChange: (value: string) => void
   empresaFilter: string
@@ -18,6 +19,7 @@ interface DashboardFiltersProps {
 }
 
 export function DashboardFilters({
+  empresas,
   searchTerm,
   onSearchChange,
   empresaFilter,
@@ -28,11 +30,9 @@ export function DashboardFilters({
   onEstadoChange,
   regiones,
 }: DashboardFiltersProps) {
-  // Filtrar regiones segun empresa seleccionada
-  const empresaSeleccionada = mockEmpresas.find(e => e.id === empresaFilter)
-  const regionesDisponibles = empresaFilter === "all" 
-    ? regiones 
-    : empresaSeleccionada?.regiones || []
+  const empresaSeleccionada = empresas.find((e) => e.id === empresaFilter)
+  const regionesDisponibles =
+    empresaFilter === "all" ? regiones : empresaSeleccionada?.regiones ?? []
 
   return (
     <div className="flex flex-col gap-3 w-full">
@@ -56,7 +56,7 @@ export function DashboardFilters({
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Todas las empresas</SelectItem>
-            {mockEmpresas.map((empresa) => (
+            {empresas.map((empresa) => (
               <SelectItem key={empresa.id} value={empresa.id}>
                 {empresa.nombre} ({empresa.total_sucursales})
               </SelectItem>

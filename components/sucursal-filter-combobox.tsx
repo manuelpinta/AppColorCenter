@@ -18,6 +18,7 @@ import {
 import { Building2, ChevronDown } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { ColorCenter } from "@/lib/types"
+import { buildSucursalCompositeId } from "@/lib/data/ids"
 
 interface SucursalFilterComboboxProps {
   value: string
@@ -36,7 +37,12 @@ export function SucursalFilterCombobox({
 }: SucursalFilterComboboxProps) {
   const [open, setOpen] = useState(false)
 
-  const selected = value === "all" ? null : colorCenters.find((c) => c.id === value)
+  const selected =
+    value === "all"
+      ? null
+      : colorCenters.find((c) =>
+          (c.empresa_id && c.id ? buildSucursalCompositeId(c.empresa_id as any, c) : c.id) === value
+        )
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -75,18 +81,22 @@ export function SucursalFilterCombobox({
               >
                 Todas las sucursales
               </CommandItem>
-              {colorCenters.map((cc) => (
-                <CommandItem
-                  key={cc.id}
-                  value={`${cc.nombre_sucursal} ${cc.codigo_interno}`}
-                  onSelect={() => {
-                    onValueChange(cc.id)
-                    setOpen(false)
-                  }}
-                >
-                  {cc.nombre_sucursal} ({cc.codigo_interno})
-                </CommandItem>
-              ))}
+              {colorCenters.map((cc) => {
+                const compositeId =
+                  cc.empresa_id && cc.id ? buildSucursalCompositeId(cc.empresa_id as any, cc) : cc.id
+                return (
+                  <CommandItem
+                    key={compositeId}
+                    value={`${cc.nombre_sucursal} ${cc.codigo_interno}`}
+                    onSelect={() => {
+                      onValueChange(compositeId)
+                      setOpen(false)
+                    }}
+                  >
+                    {cc.nombre_sucursal} ({cc.codigo_interno})
+                  </CommandItem>
+                )
+              })}
             </CommandGroup>
           </CommandList>
         </Command>

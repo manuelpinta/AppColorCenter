@@ -1,0 +1,47 @@
+import { NextRequest, NextResponse } from "next/server"
+import { getPool, getCatalogoMaestroEmpresaId } from "@/lib/db"
+import { actualizarMarca, getMarcaById } from "@/lib/data/catalogos"
+import { updateMarcaInOtrasBases } from "@/lib/data/catalogos-sync"
+
+/** Actualiza una marca en el maestro y replica a las demás bases. Body: { nombre?: string, activo?: number } (activo 0 o 1). */
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params
+  if (!id) {
+    return NextResponse.json({ error: "id requerido" }, { status: 400 })
+  }
+  let body: { nombre?: string; activo?: number }
+  try {
+    body = await request.json()
+  } catch {
+    return NextResponse.json({ error: "Cuerpo inválido" }, { status: 400 })
+  }
+  const data: { nombre?: string; activo?: number } = {}
+  if (typeof body.nombre === "string") data.nombre = body.nombre.trim()
+  if (typeof body.activo === "number") data.activo = body.activo === 1 ? 1 : 0
+  if (body.activo === true) data.activo = 1
+  if (body.activo === false) data.activo = 0
+  if (Object.keys(data).length === 0) {
+    return NextResponse.json({ error: "Enviar nombre y/o activo" }, { status: 400 })
+  }
+
+  try {
+    const empresaId = getCatalogoMaestroEmpresaId()
+    const pool = await getPool(empresaId)
+    await actualizarMarca(pool, id, data)
+    const row = await getMarcaById(pool, id)
+    if (!row) {
+      return NextResponse.json({ error: "Marca no encontrada" }, { status: 404 })
+    }
+    await updateMarcaInOtrasBases(Number(id), row.nombre, row.activo)
+    return NextResponse.json(row)
+  } catch (err) {
+    console.error("PATCH /api/catalogos/marcas/[id]", err)
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : "Error al actualizar marca" },
+      { status: 500 }
+    )
+  }
+}

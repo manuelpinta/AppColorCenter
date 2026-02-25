@@ -2,15 +2,17 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { LayoutDashboard, Building2, Wrench, ClipboardList, BarChart3 } from "lucide-react"
+import { LayoutDashboard, Building2, Wrench, ClipboardList, AlertTriangle, BarChart3, Settings2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 const navigation = [
-  { name: "Dashboard", href: "/", icon: LayoutDashboard },
-  { name: "Sucursales", href: "/sucursales", icon: Building2 },
-  { name: "Equipos", href: "/equipos", icon: Wrench },
-  { name: "Mantenimientos", href: "/mantenimientos", icon: ClipboardList },
-  { name: "Reportes", href: "/reportes", icon: BarChart3 },
+  { name: "Dashboard", short: "Inicio", href: "/", icon: LayoutDashboard },
+  { name: "Sucursales", short: "Sucur.", href: "/sucursales", icon: Building2 },
+  { name: "Equipos", short: "Equipos", href: "/equipos", icon: Wrench },
+  { name: "Mantenimientos", short: "Manten.", href: "/mantenimientos", icon: ClipboardList },
+  { name: "Incidencias", short: "Incid.", href: "/incidencias", icon: AlertTriangle },
+  { name: "Reportes", short: "Report.", href: "/reportes", icon: BarChart3 },
+  { name: "Admin catálogos", short: "Admin", href: "/admin/catalogos", icon: Settings2 },
 ]
 
 export function Sidebar() {
@@ -61,8 +63,8 @@ export function Sidebar() {
         </div>
       </aside>
 
-      <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-card border-t border-border shadow-lg">
-        <div className="flex items-center justify-around px-2 py-3 safe-area-inset-bottom">
+      <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-card border-t border-border shadow-lg safe-area-inset-bottom">
+        <div className="flex items-center justify-around px-1 py-2">
           {navigation.map((item) => {
             const isActive = pathname === item.href
             return (
@@ -70,12 +72,13 @@ export function Sidebar() {
                 key={item.name}
                 href={item.href}
                 className={cn(
-                  "flex flex-col items-center gap-1 px-2 py-1.5 rounded-lg transition-colors min-w-[60px]",
+                  "flex flex-col items-center justify-center gap-0.5 min-h-[56px] min-w-[44px] flex-1 py-2 px-1 rounded-lg transition-colors touch-manipulation",
                   isActive ? "text-primary" : "text-muted-foreground active:bg-secondary",
                 )}
+                aria-current={isActive ? "page" : undefined}
               >
-                <item.icon className={cn("h-6 w-6", isActive && "stroke-[2.5]")} />
-                <span className="text-[10px] font-medium">{item.name}</span>
+                <item.icon className={cn("h-6 w-6 shrink-0", isActive && "stroke-[2.5]")} />
+                <span className="text-[10px] font-medium leading-tight text-center max-w-full" title={item.name}>{item.short}</span>
               </Link>
             )
           })}

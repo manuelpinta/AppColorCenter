@@ -1,7 +1,16 @@
 import { MantenimientosContent } from "@/components/mantenimientos-content"
-import { mockMantenimientos, mockEquipos, mockColorCenters } from "@/lib/mock-data"
+import {
+  getMantenimientosAllBases,
+  getEquiposAllBases,
+  getColorCentersAllBases,
+} from "@/lib/data"
 
-export default function MantenimientosPage() {
+export default async function MantenimientosPage() {
+  const [mantenimientos, equipos, colorCenters] = await Promise.all([
+    getMantenimientosAllBases(),
+    getEquiposAllBases(),
+    getColorCentersAllBases(),
+  ])
   return (
     <div className="pb-20 lg:pb-0">
       <div className="px-4 py-6 lg:px-8 lg:py-8">
@@ -13,9 +22,9 @@ export default function MantenimientosPage() {
         </div>
 
         <MantenimientosContent
-          mantenimientos={mockMantenimientos}
-          equipos={mockEquipos}
-          colorCenters={mockColorCenters}
+          mantenimientos={mantenimientos}
+          equipos={equipos}
+          colorCenters={colorCenters}
         />
       </div>
     </div>

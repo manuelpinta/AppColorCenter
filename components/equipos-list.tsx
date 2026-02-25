@@ -96,6 +96,11 @@ export function EquiposList({ equipos, colorCenterId }: EquiposListProps) {
                       ? `Arrendado - ${equipo.arrendador}`
                       : "Propio"}
                   </span>
+                  {equipo.tipo_propiedad === "Arrendado" && equipo.fecha_vencimiento_arrendamiento && (
+                    <span className="ml-2 text-sm text-muted-foreground">
+                      (Vence: {new Date(equipo.fecha_vencimiento_arrendamiento).toLocaleDateString("es-ES")})
+                    </span>
+                  )}
                 </div>
                 {equipo.ultima_calibracion && (
                   <div className="flex items-center gap-2">

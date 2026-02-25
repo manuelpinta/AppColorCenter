@@ -4,7 +4,7 @@ import type { ColorCenter, Equipo } from "@/lib/types"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Building2, MapPin, User, Calendar, Wrench, ChevronRight } from "lucide-react"
+import { Building2, MapPin, Calendar, Wrench, ChevronRight } from "lucide-react"
 import Link from "next/link"
 import { useMemo } from "react"
 
@@ -77,12 +77,6 @@ export function ColorCenterGrid({ colorCenters, equipos, compact = false }: Colo
                       <span className="truncate">{center.region}</span>
                     </div>
                   )}
-                  {center.responsable && (
-                    <div className="flex items-center gap-2.5 text-muted-foreground">
-                      <User className="h-4 w-4 shrink-0 text-primary/60" />
-                      <span className="truncate">{center.responsable}</span>
-                    </div>
-                  )}
                   {center.fecha_instalacion && (
                     <div className="flex items-center gap-2.5 text-muted-foreground">
                       <Calendar className="h-4 w-4 shrink-0 text-primary/60" />
@@ -107,7 +101,14 @@ export function ColorCenterGrid({ colorCenters, equipos, compact = false }: Colo
                   </div>
                 </div>
 
-                <Link href={`/sucursales/${center.id}`} className="block">
+                <Link
+                  href={
+                    center.empresa_id
+                      ? `/sucursales/${buildSucursalCompositeId(center.empresa_id as any, center)}`
+                      : `/sucursales/${center.id}`
+                  }
+                  className="block"
+                >
                   <Button variant="outline" className="w-full bg-transparent h-10 hover:bg-primary hover:text-primary-foreground hover:border-primary transition-colors" size="sm">
                     Ver detalles
                     <ChevronRight className="h-4 w-4 ml-2" />

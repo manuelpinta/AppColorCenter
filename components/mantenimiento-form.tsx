@@ -14,6 +14,7 @@ import { ChevronLeft, Save, CheckCircle, Loader2 } from "lucide-react"
 import Link from "next/link"
 import { useMemo } from "react"
 import type { Mantenimiento, Equipo, ColorCenter } from "@/lib/types"
+import { buildSucursalCompositeIdFromIds } from "@/lib/data/ids"
 
 interface MantenimientoFormProps {
   equipos: Equipo[]
@@ -50,7 +51,7 @@ export function MantenimientoForm({
   const [formData, setFormData] = useState({
     equipo_id: mantenimiento?.equipo_id || defaultEquipoId || "",
     tipo: mantenimiento?.tipo || "Preventivo",
-    tecnico_responsable: mantenimiento?.tecnico_responsable || "",
+    realizado_por: (mantenimiento?.realizado_por ?? "Interno") as "Interno" | "Externo",
     fecha_mantenimiento: mantenimiento?.fecha_mantenimiento || new Date().toISOString().split("T")[0],
     descripcion: mantenimiento?.descripcion || "",
     piezas_cambiadas: mantenimiento?.piezas_cambiadas || "",
@@ -69,12 +70,6 @@ export function MantenimientoForm({
       // Validar campos requeridos
       if (!formData.equipo_id) {
         setError("Debes seleccionar un equipo")
-        setIsSubmitting(false)
-        return
-      }
-
-      if (!formData.tecnico_responsable) {
-        setError("El técnico responsable es requerido")
         setIsSubmitting(false)
         return
       }
@@ -130,10 +125,11 @@ export function MantenimientoForm({
   const selectedEquipo = equipos.find((e) => e.id === formData.equipo_id)
   const selectedColorCenter = selectedEquipo ? colorCenterMap.get(selectedEquipo.color_center_id) : null
 
+  const defaultColorCenter = defaultColorCenterId ? colorCenterMap.get(defaultColorCenterId) : null
   const cancelHref = defaultEquipoId
     ? `/equipos/${defaultEquipoId}`
-    : defaultColorCenterId
-      ? `/sucursales/${defaultColorCenterId}`
+    : defaultColorCenterId && defaultColorCenter?.empresa_id
+    ? `/sucursales/${buildSucursalCompositeIdFromIds(defaultColorCenter.empresa_id as any, defaultColorCenterId)}`
       : "/mantenimientos"
 
   return (
@@ -246,20 +242,23 @@ export function MantenimientoForm({
             </div>
           </div>
 
-          {/* Técnico y Fecha */}
+          {/* Realizado por (Interno/Externo) y Fecha */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="tecnico_responsable">
-                Técnico Responsable <span className="text-destructive">*</span>
-              </Label>
-              <Input
-                id="tecnico_responsable"
-                value={formData.tecnico_responsable}
-                onChange={(e) => setFormData({ ...formData, tecnico_responsable: e.target.value })}
-                placeholder="Nombre del técnico"
-              />
+              <Label htmlFor="realizado_por">Realizado por</Label>
+              <Select
+                value={formData.realizado_por}
+                onValueChange={(v) => setFormData({ ...formData, realizado_por: v as "Interno" | "Externo" })}
+              >
+                <SelectTrigger id="realizado_por">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Interno">Interno</SelectItem>
+                  <SelectItem value="Externo">Externo</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
-
             <div className="space-y-2">
               <Label htmlFor="fecha_mantenimiento">
                 Fecha de Mantenimiento <span className="text-destructive">*</span>

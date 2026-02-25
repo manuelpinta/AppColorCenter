@@ -1,23 +1,36 @@
 import { notFound } from "next/navigation"
 import Link from "next/link"
 import { EquipoForm } from "@/components/equipo-form"
-import { mockColorCenters, mockEmpresas, mockEquipos } from "@/lib/mock-data"
+import {
+  findEquipoInAllBases,
+  getEmpresas,
+  getSucursalesByEmpresa,
+  getComputadoraByEquipoId,
+  parseEquipoId,
+} from "@/lib/data"
 import { ArrowLeft } from "lucide-react"
 
 export default async function EditarEquipoPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
 
-  const equipo = mockEquipos.find((e) => e.id === id)
+  const found = await findEquipoInAllBases(id)
+  if (!found) notFound()
+  const { equipo, pool, empresaId } = found
 
-  if (!equipo) {
-    notFound()
-  }
+  const { numericId } = parseEquipoId(id)
+  const [empresas, colorCenters, computadoraInicial] = await Promise.all([
+    getEmpresas(),
+    getSucursalesByEmpresa(empresaId),
+    equipo.tipo_equipo === "Equipo de Computo"
+      ? getComputadoraByEquipoId(pool, numericId)
+      : Promise.resolve(null),
+  ])
 
   return (
     <div className="pb-20 lg:pb-0">
-      <div className="px-4 py-6 lg:px-8 lg:py-8 max-w-4xl mx-auto">
+      <div className="px-4 py-6 pb-24 lg:pb-8 lg:px-8 lg:py-8 max-w-4xl mx-auto">
         <Link
-          href={`/equipos/${equipo.id}`}
+          href={`/equipos/${id}`}
           className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground mb-4"
         >
           <ArrowLeft className="h-4 w-4 mr-1" />
@@ -31,7 +44,14 @@ export default async function EditarEquipoPage({ params }: { params: Promise<{ i
           </p>
         </div>
 
-        <EquipoForm empresas={mockEmpresas} colorCenters={mockColorCenters} equipo={equipo} />
+        <EquipoForm
+          empresas={empresas}
+          colorCenters={colorCenters}
+          equipo={equipo}
+          computadoraInicial={computadoraInicial}
+          empresaId={empresaId}
+          equipoIdForLink={id}
+        />
       </div>
     </div>
   )

@@ -1,11 +1,22 @@
 import { notFound } from "next/navigation"
 import Link from "next/link"
-import { mockColorCenters, mockEquipos, mockMantenimientos } from "@/lib/mock-data"
+import {
+  findEquipoInAllBases,
+  getSucursalesByEmpresa,
+  getMovimientosByEquipoId,
+  getIncidenciasByEquipoId,
+  getFotosByEquipoId,
+  getComputadoraByEquipoId,
+  getMantenimientosByEquipoId,
+  buildEquipoCompositeId,
+} from "@/lib/data"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { EquipoFotosSection } from "@/components/equipo-fotos-section"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
   ArrowLeft,
+  ArrowRightLeft,
   Edit,
   Plus,
   CheckCircle2,
@@ -16,21 +27,33 @@ import {
   Building2,
   Clock,
   DollarSign,
+  AlertTriangle,
+  Monitor,
+  Cpu,
+  HardDrive,
+  MemoryStick,
 } from "lucide-react"
 
 export default async function EquipoDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
 
-  const equipo = mockEquipos.find((e) => e.id === id)
-
-  if (!equipo) {
+  const found = await findEquipoInAllBases(id)
+  if (!found) {
     notFound()
   }
+  const { equipo, pool, empresaId } = found
+  const compositeId = buildEquipoCompositeId(empresaId, equipo)
 
-  const colorCenter = mockColorCenters.find((cc) => cc.id === equipo.color_center_id)
-  const mantenimientos = mockMantenimientos
-    .filter((m) => m.equipo_id === equipo.id)
-    .sort((a, b) => new Date(b.fecha_mantenimiento).getTime() - new Date(a.fecha_mantenimiento).getTime())
+  const [sucursales, mantenimientos, movimientos, incidencias, fotos, computadoraOrNull] = await Promise.all([
+    getSucursalesByEmpresa(empresaId),
+    getMantenimientosByEquipoId(pool, equipo.id),
+    getMovimientosByEquipoId(pool, equipo.id),
+    getIncidenciasByEquipoId(pool, equipo.id),
+    getFotosByEquipoId(pool, equipo.id),
+    equipo.tipo_equipo === "Equipo de Computo" ? getComputadoraByEquipoId(pool, equipo.id) : Promise.resolve(null),
+  ])
+  const colorCenter = sucursales.find((cc) => cc.id === equipo.color_center_id) ?? null
+  const computadora = computadoraOrNull
 
   const getEstadoBadge = (estado: string) => {
     switch (estado) {
@@ -97,7 +120,7 @@ export default async function EquipoDetailPage({ params }: { params: Promise<{ i
         <div className="mb-6">
           <Link
             href="/equipos"
-            className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground mb-4"
+            className="inline-flex items-center min-h-[44px] text-sm text-muted-foreground hover:text-foreground mb-4 touch-manipulation"
           >
             <ArrowLeft className="h-4 w-4 mr-1" />
             Volver a Equipos
@@ -114,15 +137,21 @@ export default async function EquipoDetailPage({ params }: { params: Promise<{ i
               </p>
             </div>
 
-            <div className="flex gap-2">
-              <Link href={`/equipos/${equipo.id}/editar`}>
-                <Button variant="outline" className="bg-transparent">
+            <div className="flex flex-wrap gap-2">
+              <Link href={`/equipos/${compositeId}/editar`}>
+                <Button variant="outline" className="bg-transparent min-h-[44px] touch-manipulation">
                   <Edit className="h-4 w-4 mr-2" />
                   Editar
                 </Button>
               </Link>
-              <Link href={`/mantenimientos/crear?equipo_id=${equipo.id}`}>
-                <Button>
+              <Link href={`/equipos/${compositeId}/mover`}>
+                <Button variant="outline" className="bg-transparent min-h-[44px] touch-manipulation">
+                  <ArrowRightLeft className="h-4 w-4 mr-2" />
+                  Mover a otra sucursal
+                </Button>
+              </Link>
+              <Link href={`/mantenimientos/crear?equipo_id=${compositeId}`}>
+                <Button className="min-h-[44px] touch-manipulation">
                   <Plus className="h-4 w-4 mr-2" />
                   Nuevo Mantenimiento
                 </Button>
@@ -180,6 +209,36 @@ export default async function EquipoDetailPage({ params }: { params: Promise<{ i
                         ? `En arrendamiento - ${equipo.arrendador}`
                         : "Propiedad nuestra"}
                     </p>
+                    {equipo.tipo_propiedad === "Arrendado" && equipo.fecha_vencimiento_arrendamiento && (
+                      <div className="mt-2 flex flex-wrap items-center gap-2">
+                        <span className="text-sm text-muted-foreground">
+                          Vencimiento contrato:{" "}
+                          {new Date(equipo.fecha_vencimiento_arrendamiento).toLocaleDateString("es-ES", {
+                            year: "numeric",
+                            month: "short",
+                            day: "numeric",
+                          })}
+                        </span>
+                        {(() => {
+                          const hoy = new Date()
+                          hoy.setHours(0, 0, 0, 0)
+                          const venc = new Date(equipo.fecha_vencimiento_arrendamiento)
+                          venc.setHours(0, 0, 0, 0)
+                          const dias = Math.ceil((venc.getTime() - hoy.getTime()) / (1000 * 60 * 60 * 24))
+                          if (dias < 0)
+                            return (
+                              <Badge className="bg-destructive/10 text-destructive border-destructive/20">Vencido</Badge>
+                            )
+                          if (dias <= 30)
+                            return (
+                              <Badge className="bg-amber-50 text-amber-700 border-amber-200">
+                                Por vencer ({dias} días)
+                              </Badge>
+                            )
+                          return null
+                        })()}
+                      </div>
+                    )}
                   </div>
                 </div>
               </CardContent>
@@ -224,6 +283,77 @@ export default async function EquipoDetailPage({ params }: { params: Promise<{ i
                 )}
               </CardContent>
             </Card>
+
+            {/* Especificaciones de computadora (solo cuando tipo = Equipo de Computo) */}
+            {equipo.tipo_equipo === "Equipo de Computo" && (
+              <Card className="border-0 shadow-sm">
+                <CardHeader>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <Monitor className="h-5 w-5" />
+                    Especificaciones de computadora
+                  </CardTitle>
+                  <CardDescription>
+                    Procesador, RAM, almacenamiento, Windows (requisitos de referencia: i5 ≥ 3.0 GHz, 16 GB RAM, ≥ 450 GB o SSD, Windows 11 Pro 23H2, 64 bits)
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {!computadora || (!computadora.procesador && computadora.ram_gb == null && computadora.almacenamiento_gb == null && !computadora.graficos && !computadora.windows_version) ? (
+                    <p className="text-sm text-muted-foreground py-2">
+                      Sin especificaciones registradas. Edita el equipo para añadirlas.
+                    </p>
+                  ) : (
+                    <>
+                      {computadora.procesador && (
+                        <div className="flex items-start gap-3">
+                          <Cpu className="h-5 w-5 text-primary/60 mt-0.5 shrink-0" />
+                          <div>
+                            <p className="text-sm text-muted-foreground">Procesador</p>
+                            <p className="font-medium text-sm">{computadora.procesador}</p>
+                          </div>
+                        </div>
+                      )}
+                      {computadora.ram_gb != null && (
+                        <div className="flex items-start gap-3">
+                          <MemoryStick className="h-5 w-5 text-primary/60 mt-0.5 shrink-0" />
+                          <div>
+                            <p className="text-sm text-muted-foreground">Memoria RAM</p>
+                            <p className="font-medium text-sm">{computadora.ram_gb} GB</p>
+                          </div>
+                        </div>
+                      )}
+                      {(computadora.almacenamiento_gb != null || computadora.tipo_almacenamiento) && (
+                        <div className="flex items-start gap-3">
+                          <HardDrive className="h-5 w-5 text-primary/60 mt-0.5 shrink-0" />
+                          <div>
+                            <p className="text-sm text-muted-foreground">Almacenamiento</p>
+                            <p className="font-medium text-sm">
+                              {computadora.almacenamiento_gb != null ? `${computadora.almacenamiento_gb} GB` : ""}
+                              {computadora.almacenamiento_gb != null && computadora.tipo_almacenamiento ? " · " : ""}
+                              {computadora.tipo_almacenamiento ?? ""}
+                            </p>
+                          </div>
+                        </div>
+                      )}
+                      {computadora.graficos && (
+                        <div>
+                          <p className="text-sm text-muted-foreground">Gráficos</p>
+                          <p className="font-medium text-sm">{computadora.graficos}</p>
+                        </div>
+                      )}
+                      {computadora.windows_version && (
+                        <div>
+                          <p className="text-sm text-muted-foreground">Versión de Windows</p>
+                          <p className="font-medium text-sm">
+                            {computadora.windows_version}
+                            {computadora.so_64bits ? " (64 bits)" : ""}
+                          </p>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </CardContent>
+              </Card>
+            )}
           </div>
 
           {/* Historial de Mantenimientos */}
@@ -271,8 +401,13 @@ export default async function EquipoDetailPage({ params }: { params: Promise<{ i
 
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
                           <div className="flex items-center gap-1.5 text-muted-foreground">
-                            <User className="h-4 w-4" />
-                            <span className="truncate">{mantenimiento.tecnico_responsable}</span>
+                            <WrenchIcon className="h-4 w-4" />
+                            <span className="truncate">
+                              {mantenimiento.realizado_por === "Externo" ? "Externo" : "Interno"}
+                              {mantenimiento.realizado_por === "Interno" && mantenimiento.tecnico_responsable && (
+                                <> · {mantenimiento.tecnico_responsable}</>
+                              )}
+                            </span>
                           </div>
                           {mantenimiento.tiempo_fuera_servicio && (
                             <div className="flex items-center gap-1.5 text-muted-foreground">
@@ -306,6 +441,117 @@ export default async function EquipoDetailPage({ params }: { params: Promise<{ i
                     ))}
                   </div>
                 )}
+              </CardContent>
+            </Card>
+
+            {/* Fotos del equipo (estado, varias con fecha) */}
+            <EquipoFotosSection equipoId={compositeId} fotos={fotos} />
+
+            {/* Historial de movimientos */}
+            <Card className="border-0 shadow-sm">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <ArrowRightLeft className="h-5 w-5" />
+                  Historial de movimientos
+                </CardTitle>
+                <CardDescription>
+                  Registro de cambios de sucursal de este equipo
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {movimientos.length === 0 ? (
+                  <p className="text-sm text-muted-foreground py-4">
+                    No hay movimientos registrados para este equipo.
+                  </p>
+                ) : (
+                  <div className="space-y-4">
+                    {movimientos.map((mov) => {
+                      const origen = sucursales.find((c) => c.id === mov.sucursal_origen_id)
+                      const destino = sucursales.find((c) => c.id === mov.sucursal_destino_id)
+                      return (
+                        <div
+                          key={mov.id}
+                          className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 py-3 border-b border-border/50 last:border-0"
+                        >
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-sm truncate">{origen?.nombre_sucursal ?? mov.sucursal_origen_id}</p>
+                            <p className="text-xs text-muted-foreground">{origen?.codigo_interno}</p>
+                          </div>
+                          <ArrowRightLeft className="h-4 w-4 text-muted-foreground shrink-0 self-center" />
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-sm truncate">{destino?.nombre_sucursal ?? mov.sucursal_destino_id}</p>
+                            <p className="text-xs text-muted-foreground">{destino?.codigo_interno}</p>
+                          </div>
+                          <div className="text-right shrink-0">
+                            <p className="text-sm font-medium">
+                              {new Date(mov.fecha_movimiento).toLocaleDateString("es-ES", {
+                                year: "numeric",
+                                month: "short",
+                                day: "numeric",
+                              })}
+                            </p>
+                            {mov.motivo && (
+                              <p className="text-xs text-muted-foreground mt-0.5 max-w-[200px] sm:max-w-none truncate sm:whitespace-normal" title={mov.motivo}>
+                                {mov.motivo}
+                              </p>
+                            )}
+                            {mov.registrado_por && (
+                              <p className="text-xs text-muted-foreground mt-0.5">{mov.registrado_por}</p>
+                            )}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Incidencias */}
+            <Card className="border-0 shadow-sm">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <AlertTriangle className="h-5 w-5" />
+                  Incidencias
+                </CardTitle>
+                <CardDescription>
+                  Reportes de problema asociados a este equipo
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {incidencias.length === 0 ? (
+                  <p className="text-sm text-muted-foreground py-4">
+                    No hay incidencias reportadas para este equipo.
+                  </p>
+                ) : (
+                  <div className="space-y-3">
+                    {incidencias.map((inc) => (
+                      <div
+                        key={inc.id}
+                        className="flex flex-col sm:flex-row sm:items-center gap-2 py-3 border-b border-border/50 last:border-0"
+                      >
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium line-clamp-2">{inc.descripcion}</p>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            {inc.quien_reporta ?? "—"} · {new Date(inc.fecha_reporte).toLocaleDateString("es-ES")}
+                          </p>
+                        </div>
+                        <Badge variant="outline" className="shrink-0 w-fit">{inc.estado}</Badge>
+                        <Link href={`/incidencias/${inc.id}`}>
+                          <Button variant="ghost" size="sm">Ver</Button>
+                        </Link>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <div className="mt-4">
+                  <Link href={`/incidencias/crear?equipo_id=${compositeId}&sucursal_id=${equipo.color_center_id}`}>
+                    <Button variant="outline" size="sm">
+                      <Plus className="h-4 w-4 mr-2" />
+                      Reportar incidencia
+                    </Button>
+                  </Link>
+                </div>
               </CardContent>
             </Card>
           </div>
