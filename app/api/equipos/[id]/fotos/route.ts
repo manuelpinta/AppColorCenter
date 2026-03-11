@@ -56,8 +56,12 @@ export async function POST(
         .upload(path, file, { contentType: file.type, upsert: false });
       if (uploadError) {
         console.error("[Supabase Storage upload]", uploadError);
+        const detail = uploadError.message ?? uploadError.error ?? "";
         return NextResponse.json(
-          { error: "Error al subir la imagen. Revisa que el bucket exista y las variables SUPABASE_* estén configuradas." },
+          {
+            error: "Error al subir la imagen. Revisa que el bucket exista y las variables SUPABASE_* estén configuradas.",
+            detail: detail || undefined,
+          },
           { status: 502 }
         );
       }
@@ -66,7 +70,7 @@ export async function POST(
     } catch (err) {
       if (err instanceof Error && err.message.includes("SUPABASE")) {
         return NextResponse.json(
-          { error: "Storage no configurado. Añade NEXT_PUBLIC_SUPABASE_URL y SUPABASE_SERVICE_ROLE_KEY en .env" },
+          { error: "Storage no configurado. Añade NEXT_PUBLIC_SUPABASE_URL y SUPABASE_SERVICE_ROLE_KEY o NEXT_PUBLIC_SUPABASE_ANON_KEY en .env" },
           { status: 503 }
         );
       }

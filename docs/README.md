@@ -4,6 +4,15 @@
 
 ---
 
+## UI y diseño
+
+| Archivo | Uso |
+|---------|-----|
+| **PLAN-MOBILE-UX.md** | Plan de mejora UX/UI móvil (crítica por zona, prioridades P0–P3). Incluye estado de lo ya implementado. |
+| **ESTADO-UI-DISENO.md** | Resumen de decisiones de diseño aplicadas: tokens, móvil (cabeceras, filtros, touch, detalle equipo), navegación, reportes. |
+
+---
+
 ## Bases de datos
 
 | Archivo | Uso |
@@ -46,9 +55,25 @@
 
 ---
 
+## Manual de usuario
+
+| Archivo | Uso |
+|---------|-----|
+| **MANUAL-USUARIO.md** | Manual de uso: cómo hacer cada cosa (subir equipo, mover equipo, registrar mantenimiento, reportar incidencia, etc.) con rutas y pasos. |
+
+---
+
 ## Resumen rápido
 
-- **Nuevo en el proyecto:** README raíz + database-schema.md + .env.example.
 - **Montar bases:** schema.sql + schema-fase2.sql (por empresa); schema-base-comun.sql (base común).
 - **Login y permisos:** BASE-COMUN-Y-LOGIN.md.
 - **Lentitud o conexiones:** RENDIMIENTO-Y-CONEXIONES-MYSQL.md.
+- **UI móvil y diseño:** PLAN-MOBILE-UX.md (plan), ESTADO-UI-DISENO.md (qué está aplicado).
+
+## Documentos por tipo
+
+- **Imprescindibles:** README (este índice), database-schema.md, .env.example, schema.sql, schema-base-comun.sql si usas base común.
+- **Referencia de uso:** MANUAL-USUARIO.md (cómo hacer cada acción).
+- **Referencia técnica:** QUERIES.md, RENDIMIENTO-Y-CONEXIONES-MYSQL.md, ARQUITECTURA-BUNDLE.md.
+- **Fases y criterios:** FASE1.md, FASE2.md, planificacion-funcional.md (criterios para movimientos, incidencias, costos).
+- **Opcional:** schema-base-comun.md repite en prosa el contenido del DDL schema-base-comun.sql; BASE-COMUN-Y-LOGIN.md ya enlaza ambos.

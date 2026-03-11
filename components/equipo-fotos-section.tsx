@@ -111,7 +111,8 @@ export function EquipoFotosSection({ equipoId, fotos: initialFotos }: EquipoFoto
       })
       const data = await res.json()
       if (!res.ok) {
-        setError(data.error ?? "Error al guardar la foto")
+        const msg = data.error ?? "Error al guardar la foto"
+        setError(data.detail ? `${msg} (${data.detail})` : msg)
         return
       }
       setFotos((prev) => [data.foto, ...prev])

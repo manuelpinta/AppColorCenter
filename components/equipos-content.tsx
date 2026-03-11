@@ -78,7 +78,7 @@ export function EquiposContent({ equipos, colorCenters }: EquiposContentProps) {
               placeholder="Buscar por tipo, marca, modelo, N° serie o sucursal..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="pl-9 h-10 w-full"
+              className="pl-9 h-10 min-h-[44px] w-full"
             />
           </div>
           <div className="flex flex-wrap gap-2">
@@ -86,10 +86,10 @@ export function EquiposContent({ equipos, colorCenters }: EquiposContentProps) {
               value={sucursalId}
               onValueChange={setSucursalId}
               colorCenters={colorCenters}
-              triggerClassName="w-full sm:w-auto sm:min-w-[200px]"
+              triggerClassName="w-full sm:w-auto sm:min-w-[200px] min-h-[44px] sm:min-h-[40px]"
             />
             <Select value={propiedad} onValueChange={(v) => setPropiedad(v as "all" | "Propio" | "Arrendado")}>
-              <SelectTrigger className="w-full sm:w-auto sm:min-w-[200px] h-10">
+              <SelectTrigger className="w-full sm:w-auto sm:min-w-[200px] h-10 min-h-[44px] sm:min-h-0">
                 <SelectValue placeholder="Propiedad" />
               </SelectTrigger>
               <SelectContent>
@@ -98,7 +98,7 @@ export function EquiposContent({ equipos, colorCenters }: EquiposContentProps) {
                 <SelectItem value="Arrendado">En arrendamiento</SelectItem>
               </SelectContent>
             </Select>
-            <div className="flex items-center gap-2 h-10 px-3 rounded-md border bg-background min-w-[200px]">
+            <div className="flex items-center gap-2 min-h-[44px] sm:min-h-0 h-10 px-3 rounded-md border bg-background min-w-[200px] touch-manipulation">
               <Checkbox
                 id="solo-por-vencer"
                 checked={soloPorVencer}

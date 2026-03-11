@@ -1,7 +1,7 @@
 # Fase 1 – Alcance y estado
 
 Resumen de lo implementado en Fase 1 y pendiente para fases posteriores.
-.\run-dev.cmd
+
 ---
 
 ## Incluido en Fase 1
@@ -12,6 +12,7 @@ Resumen de lo implementado en Fase 1 y pendiente para fases posteriores.
 - **Equipos:** CRUD contra BD (crear, editar, mover); listados y detalle desde Color Center.
 - **Incidencias, mantenimientos, movimientos, fotos:** Lectura/escritura contra Color Center.
 - **Documentación:** README, `database-schema.md` (incl. bases comun), `docs/README.md` (índice de docs), `.env.example` como plantilla.
+- **UI/UX móvil y diseño:** Filtros en Sheet (Dashboard, Sucursales), touch targets 44px, cabeceras compactas, resumen en scroll horizontal, tarjetas con elevación y borde, header del detalle de equipo con fondo en móvil. Ver `docs/PLAN-MOBILE-UX.md` y sección "UI y diseño" en `docs/README.md`.
 
 ---
 

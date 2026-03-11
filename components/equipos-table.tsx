@@ -147,12 +147,12 @@ export function EquiposTable({ equipos, colorCenters }: EquiposTableProps) {
           hoy.setHours(0, 0, 0, 0)
           const dias = vencDate ? Math.ceil((vencDate.getTime() - hoy.getTime()) / (1000 * 60 * 60 * 24)) : null
           return (
-            <Link key={equipo.id} href={`/equipos/${equipo.id}`}>
-              <Card className="border-0 shadow-sm hover:shadow-md transition-shadow active:bg-muted/30">
+            <Link key={equipo.id} href={`/equipos/${equipo.id}`} title={`${equipo.tipo_equipo} ${equipo.marca ?? ""} ${equipo.modelo ?? ""}`.trim()}>
+              <Card className="border border-border/60 shadow-sm card-elevated transition-all duration-200 active:bg-muted/30 rounded-2xl">
                 <CardContent className="p-4 flex items-start justify-between gap-3">
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2 mb-1">
-                      <span className="font-medium text-foreground">{equipo.tipo_equipo}</span>
+                      <span className="text-base font-semibold text-foreground">{equipo.tipo_equipo}</span>
                       {getEstadoBadge(equipo.estado)}
                     </div>
                     <p className="text-sm text-muted-foreground truncate">

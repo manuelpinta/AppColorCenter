@@ -2,9 +2,10 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { LayoutDashboard, Building2, Wrench, ClipboardList, AlertTriangle, BarChart3, Settings2 } from "lucide-react"
+import { LayoutDashboard, Building2, Wrench, ClipboardList, AlertTriangle, BarChart3 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
+// Enlaces visibles en el sidebar (Admin catálogos queda oculto; accesible solo por URL directa /admin/catalogos)
 const navigation = [
   { name: "Dashboard", short: "Inicio", href: "/", icon: LayoutDashboard },
   { name: "Sucursales", short: "Sucur.", href: "/sucursales", icon: Building2 },
@@ -12,7 +13,6 @@ const navigation = [
   { name: "Mantenimientos", short: "Manten.", href: "/mantenimientos", icon: ClipboardList },
   { name: "Incidencias", short: "Incid.", href: "/incidencias", icon: AlertTriangle },
   { name: "Reportes", short: "Report.", href: "/reportes", icon: BarChart3 },
-  { name: "Admin catálogos", short: "Admin", href: "/admin/catalogos", icon: Settings2 },
 ]
 
 export function Sidebar() {
@@ -24,8 +24,8 @@ export function Sidebar() {
       <aside className="hidden lg:fixed lg:inset-y-0 lg:left-0 lg:z-40 lg:w-64 lg:flex lg:flex-col bg-card border-r border-border shadow-sm">
         <div className="flex flex-col h-full">
           {/* Logo */}
-          <div className="flex items-center gap-3 px-6 py-5 border-b border-border">
-            <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center shadow-sm">
+          <div className="flex items-center gap-3 px-6 py-5 border-b border-border bg-primary/[0.04]">
+            <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center shadow-sm ring-2 ring-primary/20">
               <Building2 className="h-5 w-5 text-primary-foreground" />
             </div>
             <div>
@@ -71,6 +71,8 @@ export function Sidebar() {
               <Link
                 key={item.name}
                 href={item.href}
+                title={item.name}
+                aria-label={item.name}
                 className={cn(
                   "flex flex-col items-center justify-center gap-0.5 min-h-[56px] min-w-[44px] flex-1 py-2 px-1 rounded-lg transition-colors touch-manipulation",
                   isActive ? "text-primary" : "text-muted-foreground active:bg-secondary",
@@ -78,7 +80,7 @@ export function Sidebar() {
                 aria-current={isActive ? "page" : undefined}
               >
                 <item.icon className={cn("h-6 w-6 shrink-0", isActive && "stroke-[2.5]")} />
-                <span className="text-[10px] font-medium leading-tight text-center max-w-full" title={item.name}>{item.short}</span>
+                <span className="text-[10px] font-medium leading-tight text-center max-w-full">{item.short}</span>
               </Link>
             )
           })}

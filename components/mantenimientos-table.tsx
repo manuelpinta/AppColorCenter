@@ -167,7 +167,7 @@ export function MantenimientosTable({ mantenimientos, equipos, colorCenters }: M
           const colorCenter = equipo ? findCC(equipo, colorCenters) : null
           return (
             <Link key={mant.id} href={`/mantenimientos/${mant.id}`}>
-              <Card className="border-0 shadow-sm hover:shadow-md transition-shadow active:bg-muted/30">
+              <Card className="border border-border/60 shadow-sm card-elevated transition-all duration-200 active:bg-muted/30 rounded-2xl">
                 <CardContent className="p-4 flex items-start justify-between gap-3">
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2 mb-1">

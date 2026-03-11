@@ -115,50 +115,54 @@ export default async function EquipoDetailPage({ params }: { params: Promise<{ i
 
   return (
     <div className="pb-20 lg:pb-0">
-      <div className="px-4 py-6 lg:px-8 lg:py-8 max-w-6xl mx-auto">
-        {/* Header */}
-        <div className="mb-6">
+      <div className="px-4 py-0 lg:px-8 lg:py-8 max-w-6xl mx-auto">
+        {/* Header: en móvil con fondo y borde para que no flote en blanco */}
+        <header className="lg:mb-6 -mx-4 px-4 pt-4 pb-5 lg:mx-0 lg:px-0 lg:pt-0 lg:pb-0 lg:bg-transparent bg-muted/40 lg:rounded-none rounded-b-2xl border-b border-border/60 lg:border-0">
           <Link
             href="/equipos"
-            className="inline-flex items-center min-h-[44px] text-sm text-muted-foreground hover:text-foreground mb-4 touch-manipulation"
+            className="inline-flex items-center gap-2 min-h-[44px] text-sm text-muted-foreground hover:text-foreground touch-manipulation mb-4 lg:mb-4"
           >
-            <ArrowLeft className="h-4 w-4 mr-1" />
-            Volver a Equipos
+            <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-background/80 border border-border/60 lg:h-auto lg:w-auto lg:bg-transparent lg:border-0 lg:p-0">
+              <ArrowLeft className="h-4 w-4 lg:mr-1" />
+            </span>
+            <span className="lg:inline">Volver a Equipos</span>
           </Link>
 
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div>
-              <div className="flex items-center gap-3">
-                <h1 className="text-2xl lg:text-3xl font-bold text-foreground tracking-tight">{equipo.tipo_equipo}</h1>
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+                <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-foreground tracking-tight">{equipo.tipo_equipo}</h1>
                 {getEstadoBadge(equipo.estado)}
               </div>
-              <p className="text-muted-foreground mt-1">
+              <p className="text-muted-foreground mt-1 text-sm sm:text-base">
                 {equipo.marca} {equipo.modelo && `- ${equipo.modelo}`}
               </p>
             </div>
 
-            <div className="flex flex-wrap gap-2">
-              <Link href={`/equipos/${compositeId}/editar`}>
-                <Button variant="outline" className="bg-transparent min-h-[44px] touch-manipulation">
+            <div className="flex flex-col sm:flex-row flex-wrap gap-2">
+              <Link href={`/equipos/${compositeId}/editar`} className="flex-1 min-w-0 sm:flex-initial">
+                <Button variant="outline" size="default" className="w-full sm:w-auto min-h-[44px] touch-manipulation border-border bg-background/80 hover:bg-muted/50">
                   <Edit className="h-4 w-4 mr-2" />
                   Editar
                 </Button>
               </Link>
-              <Link href={`/equipos/${compositeId}/mover`}>
-                <Button variant="outline" className="bg-transparent min-h-[44px] touch-manipulation">
+              <Link href={`/equipos/${compositeId}/mover`} className="flex-1 min-w-0 sm:flex-initial">
+                <Button variant="outline" size="default" className="w-full sm:w-auto min-h-[44px] touch-manipulation border-border bg-background/80 hover:bg-muted/50">
                   <ArrowRightLeft className="h-4 w-4 mr-2" />
-                  Mover a otra sucursal
+                  Mover
                 </Button>
               </Link>
-              <Link href={`/mantenimientos/crear?equipo_id=${compositeId}`}>
-                <Button className="min-h-[44px] touch-manipulation">
+              <Link href={`/mantenimientos/crear?equipo_id=${compositeId}`} className="w-full sm:w-auto sm:flex-initial">
+                <Button size="default" className="w-full min-h-[44px] touch-manipulation shadow-sm">
                   <Plus className="h-4 w-4 mr-2" />
                   Nuevo Mantenimiento
                 </Button>
               </Link>
             </div>
           </div>
-        </div>
+        </header>
+
+        <div className="pt-6 lg:pt-0">
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Información del Equipo */}
@@ -555,6 +559,7 @@ export default async function EquipoDetailPage({ params }: { params: Promise<{ i
               </CardContent>
             </Card>
           </div>
+        </div>
         </div>
       </div>
     </div>

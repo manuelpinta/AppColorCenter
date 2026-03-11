@@ -6,7 +6,15 @@ import { TableColumnFilter } from "@/components/table-column-filter"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Building2, MapPin, ChevronRight, ChevronLeft, LayoutGrid, List, Search, X } from "lucide-react"
+import { Checkbox } from "@/components/ui/checkbox"
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet"
+import { Building2, MapPin, ChevronRight, ChevronLeft, LayoutGrid, List, Search, X, Filter } from "lucide-react"
 import Link from "next/link"
 import type { ColorCenter, Empresa } from "@/lib/types"
 import type { EquipoWithEmpresa } from "@/lib/types"
@@ -40,6 +48,7 @@ export function DashboardContent({
   const [filterRegionSet, setFilterRegionSet] = useState<Set<string> | null>(null)
   const [sortBy, setSortBy] = useState<"sucursal" | "empresa" | "region" | "equipos" | null>(null)
   const [sortOrder, setSortOrder] = useState<SortOrder>("desc")
+  const [filtersSheetOpen, setFiltersSheetOpen] = useState(false)
   const DEFAULT_SORT_KEY = "sucursal" as const
   const DEFAULT_SORT_ORDER: SortOrder = "asc"
 
@@ -181,14 +190,106 @@ export function DashboardContent({
     <div className="space-y-6">
       <KPICards kpis={kpis} />
 
-      <div className="relative w-full max-w-md">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-        <Input
-          placeholder="Buscar sucursal o código..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="pl-9 h-11 min-h-[44px] w-full"
-        />
+      <div className="flex flex-col sm:block gap-2">
+        <div className="flex gap-2 max-w-md">
+          <div className="relative flex-1 min-w-0">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+            <Input
+              placeholder="Buscar sucursal o código..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-9 h-11 min-h-[44px] w-full"
+            />
+          </div>
+          <Sheet open={filtersSheetOpen} onOpenChange={setFiltersSheetOpen}>
+            <SheetTrigger asChild>
+              <Button
+                variant="outline"
+                size="default"
+                className="md:hidden shrink-0 min-h-[44px] px-3 gap-2"
+                aria-label="Abrir filtros"
+              >
+                <Filter className="h-4 w-4" />
+                Filtros
+              </Button>
+            </SheetTrigger>
+            <SheetContent side="bottom" className="max-h-[85vh] overflow-y-auto">
+              <SheetHeader>
+                <SheetTitle>Filtros</SheetTitle>
+              </SheetHeader>
+              <div className="space-y-6 py-4">
+                <div>
+                  <p className="text-sm font-medium text-foreground mb-2">Empresa</p>
+                  <div className="space-y-2 max-h-48 overflow-y-auto">
+                    <label className="flex items-center gap-2 py-2 cursor-pointer">
+                      <Checkbox
+                        checked={filterEmpresaSet === null || (filterEmpresaSet !== null && filterEmpresaSet.size === empresaOptions.length)}
+                        onCheckedChange={(c) => setFilterEmpresaSet(c ? null : new Set())}
+                      />
+                      <span className="text-sm">Todas ({empresaOptions.length})</span>
+                    </label>
+                    {empresaOptions.map((opt) => (
+                      <label key={opt.value} className="flex items-center gap-2 py-2 cursor-pointer">
+                        <Checkbox
+                          checked={filterEmpresaSet === null || (filterEmpresaSet?.has(opt.value) ?? false)}
+                          onCheckedChange={(c) => {
+                            const checked = !!c
+                            if (filterEmpresaSet === null) {
+                              if (!checked) setFilterEmpresaSet(new Set(empresaOptions.filter((o) => o.value !== opt.value).map((o) => o.value)))
+                              return
+                            }
+                            const next = new Set(filterEmpresaSet)
+                            if (checked) next.add(opt.value)
+                            else next.delete(opt.value)
+                            setFilterEmpresaSet(next.size === 0 ? new Set() : next.size === empresaOptions.length ? null : next)
+                          }}
+                        />
+                        <span className="text-sm truncate">{opt.label}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-foreground mb-2">Región</p>
+                  <div className="space-y-2 max-h-48 overflow-y-auto">
+                    <label className="flex items-center gap-2 py-2 cursor-pointer">
+                      <Checkbox
+                        checked={filterRegionSet === null || (filterRegionSet !== null && filterRegionSet.size === regionOptions.length)}
+                        onCheckedChange={(c) => setFilterRegionSet(c ? null : new Set())}
+                      />
+                      <span className="text-sm">Todas ({regionOptions.length})</span>
+                    </label>
+                    {regionOptions.map((opt) => (
+                      <label key={opt.value} className="flex items-center gap-2 py-2 cursor-pointer">
+                        <Checkbox
+                          checked={filterRegionSet === null || (filterRegionSet?.has(opt.value) ?? false)}
+                          onCheckedChange={(c) => {
+                            const checked = !!c
+                            if (filterRegionSet === null) {
+                              if (!checked) setFilterRegionSet(new Set(regionOptions.filter((o) => o.value !== opt.value).map((o) => o.value)))
+                              return
+                            }
+                            const next = new Set(filterRegionSet)
+                            if (checked) next.add(opt.value)
+                            else next.delete(opt.value)
+                            setFilterRegionSet(next.size === 0 ? new Set() : next.size === regionOptions.length ? null : next)
+                          }}
+                        />
+                        <span className="text-sm truncate">{opt.label}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+                <Button
+                  className="w-full min-h-[44px]"
+                  onClick={() => setFiltersSheetOpen(false)}
+                >
+                  Cerrar
+                </Button>
+              </div>
+            </SheetContent>
+          </Sheet>
+        </div>
       </div>
 
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
@@ -196,11 +297,11 @@ export function DashboardContent({
           Mostrando <span className="font-medium text-foreground">{paginatedCenters.length}</span> de{" "}
           <span className="font-medium text-foreground">{sortedCenters.length}</span> sucursales
         </p>
-        <div className="flex items-center gap-1 border rounded-lg p-1 sm:self-auto self-start">
+        <div className="hidden md:flex items-center gap-1 border rounded-lg p-1 sm:self-auto self-start">
           <Button
             variant={viewMode === "list" ? "secondary" : "ghost"}
             size="sm"
-            className="h-8 px-2"
+            className="h-8 min-h-[44px] md:min-h-0 px-2"
             onClick={() => setViewMode("list")}
           >
             <List className="h-4 w-4" />
@@ -208,7 +309,7 @@ export function DashboardContent({
           <Button
             variant={viewMode === "grid" ? "secondary" : "ghost"}
             size="sm"
-            className="h-8 px-2"
+            className="h-8 min-h-[44px] md:min-h-0 px-2"
             onClick={() => setViewMode("grid")}
           >
             <LayoutGrid className="h-4 w-4" />
@@ -245,7 +346,7 @@ export function DashboardContent({
           <Button
             variant="ghost"
             size="sm"
-            className="ml-auto h-8 text-muted-foreground hover:text-foreground"
+            className="ml-auto min-h-[44px] md:min-h-8 h-8 text-muted-foreground hover:text-foreground touch-manipulation"
             onClick={() => {
               setFilterEmpresaSet(null)
               setFilterRegionSet(null)
@@ -257,26 +358,56 @@ export function DashboardContent({
         </div>
       ) : null}
 
+      {/* Empty state cuando no hay resultados */}
+      {sortedCenters.length === 0 && (
+        <Card className="border-0 shadow-sm">
+          <CardContent className="py-10 px-6 text-center">
+            <p className="text-muted-foreground">
+              No hay sucursales que coincidan con la búsqueda o filtros.
+            </p>
+            <p className="text-sm text-muted-foreground mt-1">
+              Prueba a cambiar los criterios o limpiar los filtros.
+            </p>
+            {(filterEmpresaSet !== null && filterEmpresaSet.size > 0) ||
+            (filterRegionSet !== null && filterRegionSet.size > 0) ? (
+              <Button
+                variant="outline"
+                size="sm"
+                className="mt-4 min-h-[44px] sm:min-h-9"
+                onClick={() => {
+                  setFilterEmpresaSet(null)
+                  setFilterRegionSet(null)
+                }}
+              >
+                Limpiar filtros
+              </Button>
+            ) : null}
+          </CardContent>
+        </Card>
+      )}
+
       {/* Vista de lista: móvil = cards, desktop = tabla */}
-      {viewMode === "list" && (
+      {viewMode === "list" && sortedCenters.length > 0 && (
         <>
           <div className="md:hidden space-y-2">
             {paginatedCenters.map((center) => {
               const compositeId = getCenterCompositeId(center)
+              const equiposCount = getEquiposCount(center)
+              const secondaryParts = [center.codigo_interno, getEmpresaNombre(center.empresa_id), center.region].filter(Boolean)
               return (
-                <Link key={compositeId} href={`/sucursales/${compositeId}`}>
-                  <Card className="border-0 shadow-sm hover:shadow-md transition-shadow active:bg-muted/30">
+                <Link key={compositeId} href={`/sucursales/${compositeId}`} title={center.nombre_sucursal}>
+                  <Card className="border border-border/60 shadow-sm card-elevated transition-all duration-200 active:bg-muted/30 rounded-2xl">
                     <CardContent className="p-4 flex items-center justify-between gap-3">
                       <div className="min-w-0 flex-1">
-                        <p className="font-medium text-foreground truncate">{center.nombre_sucursal}</p>
-                        <p className="text-xs text-muted-foreground">{center.codigo_interno}</p>
-                        <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1 text-xs text-muted-foreground">
-                          <span>{getEmpresaNombre(center.empresa_id)}</span>
-                          {center.region && <span>{center.region}</span>}
-                          <span>{getEquiposCount(center)} equipos</span>
-                        </div>
+                        <p className="text-base font-semibold text-foreground truncate">{center.nombre_sucursal}</p>
+                        <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                          {secondaryParts.join(" · ")}
+                        </p>
                       </div>
-                      <ChevronRight className="h-5 w-5 text-muted-foreground shrink-0" />
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className="text-xs text-muted-foreground">{equiposCount} equipos</span>
+                        <ChevronRight className="h-5 w-5 text-muted-foreground" />
+                      </div>
                     </CardContent>
                   </Card>
                 </Link>
@@ -378,12 +509,12 @@ export function DashboardContent({
       )}
 
       {/* Vista de grid */}
-      {viewMode === "grid" && (
+      {viewMode === "grid" && sortedCenters.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {paginatedCenters.map((center) => {
             const compositeId = getCenterCompositeId(center)
             return (
-              <Card key={compositeId} className="border-0 shadow-sm hover:shadow-md transition-shadow">
+              <Card key={compositeId} className="border border-border/60 shadow-sm card-elevated transition-all duration-200 rounded-2xl">
                 <CardContent className="p-4">
                   <div className="flex items-start justify-between gap-2 mb-3">
                     <div className="flex items-center gap-2 min-w-0">
@@ -435,7 +566,7 @@ export function DashboardContent({
               size="sm"
               onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
               disabled={currentPage === 1}
-              className="h-9"
+              className="h-9 min-h-[44px] sm:min-h-9"
             >
               <ChevronLeft className="h-4 w-4 mr-1" />
               Anterior
@@ -470,7 +601,7 @@ export function DashboardContent({
               size="sm"
               onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
               disabled={currentPage === totalPages}
-              className="h-9"
+              className="h-9 min-h-[44px] sm:min-h-9"
             >
               Siguiente
               <ChevronRight className="h-4 w-4 ml-1" />

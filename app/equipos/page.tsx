@@ -17,8 +17,8 @@ export default async function EquiposPage() {
       <div className="px-4 py-6 lg:px-8 lg:py-8">
         <div className="mb-6 lg:mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="text-2xl lg:text-3xl font-bold text-foreground">Equipos</h1>
-            <p className="text-sm lg:text-base text-muted-foreground mt-1">Gestión de todos los equipos</p>
+            <h1 className="text-xl lg:text-3xl font-bold text-foreground">Equipos</h1>
+            <p className="text-xs lg:text-base text-muted-foreground mt-1">Gestión de todos los equipos</p>
           </div>
           <Link href="/equipos/crear">
             <Button className="w-full sm:w-auto min-h-[44px] touch-manipulation">

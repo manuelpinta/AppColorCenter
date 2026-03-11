@@ -161,7 +161,7 @@ export function IncidenciasTable({ incidencias, colorCenters, equipos }: Inciden
           const equipo = findEquipo(inc, equipos)
           return (
             <Link key={inc.id} href={`/incidencias/${inc.id}`}>
-              <Card className="border-0 shadow-sm hover:shadow-md transition-shadow active:bg-muted/30">
+              <Card className="border border-border/60 shadow-sm card-elevated transition-all duration-200 active:bg-muted/30 rounded-2xl">
                 <CardContent className="p-4 flex items-start justify-between gap-3">
                   <div className="min-w-0 flex-1">
                     <p className="text-sm text-foreground line-clamp-2">{inc.descripcion}</p>

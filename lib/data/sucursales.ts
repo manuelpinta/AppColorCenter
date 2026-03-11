@@ -121,7 +121,7 @@ async function getSucursalesFromComun(empresaId: EmpresaId): Promise<ColorCenter
   let list = rows.map((r) => ({
     id: String(r.id ?? ""),
     empresa_id: empresaId,
-    codigo_interno: "",
+    codigo_interno: String(r.id ?? ""),
     nombre_sucursal: String(r.nombre_sucursal ?? ""),
     region: r.region != null && r.region !== "" ? String(r.region) : null,
     ubicacion: null,

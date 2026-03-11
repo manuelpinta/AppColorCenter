@@ -82,8 +82,15 @@ export function EquipoForm({
   equipoIdForLink,
 }: EquipoFormProps) {
   const router = useRouter()
+  const errorRef = useRef<HTMLDivElement>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  const setErrorAndScroll = (message: string) => {
+    setError(message)
+    setIsSubmitting(false)
+    setTimeout(() => errorRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }), 100)
+  }
 
   const defaultCcIdForResolve = equipo?.color_center_id || defaultColorCenterId || ""
   const initial = useMemo(
@@ -250,17 +257,13 @@ export function EquipoForm({
     setError(null)
 
     try {
-      // Validar que se haya seleccionado un Color Center
       if (!formData.color_center_id) {
-        setError("Debes seleccionar un Color Center")
-        setIsSubmitting(false)
+        setErrorAndScroll("Debes seleccionar una sucursal para asignar el equipo (obligatorio para cualquier tipo, incluido Equipo de computo).")
         return
       }
 
-      // Validar campos requeridos
       if (!formData.tipo_equipo) {
-        setError("El tipo de equipo es requerido")
-        setIsSubmitting(false)
+        setErrorAndScroll("El tipo de equipo es obligatorio.")
         return
       }
 
@@ -305,11 +308,10 @@ export function EquipoForm({
         })
         if (!res.ok) {
           const d = await res.json()
-          setError(d.error ?? "Error al actualizar")
-          setIsSubmitting(false)
+          setErrorAndScroll(d.error ?? "Error al actualizar")
           return
         }
-        router.push(equipoIdForLink ?? `/equipos/${equipo.id}`)
+        router.push(`/equipos/${equipoIdForLink ?? equipo.id}`)
         router.refresh()
         return
       }
@@ -349,8 +351,7 @@ export function EquipoForm({
       })
       if (!res.ok) {
         const d = await res.json()
-        setError(d.error ?? "Error al crear equipo")
-        setIsSubmitting(false)
+        setErrorAndScroll(d.error ?? "Error al crear equipo")
         return
       }
       const { equipo: created } = await res.json()
@@ -359,8 +360,7 @@ export function EquipoForm({
       router.refresh()
     } catch (err) {
       console.error("Error saving equipo:", err)
-      setError("Error al guardar el equipo. Por favor intenta de nuevo.")
-      setIsSubmitting(false)
+      setErrorAndScroll("Error al guardar el equipo. Por favor intenta de nuevo.")
     }
   }
 
@@ -385,8 +385,15 @@ export function EquipoForm({
           </div>
         </CardHeader>
         <CardContent className="space-y-4 lg:space-y-6">
+          <p className="text-sm text-muted-foreground">
+            <strong className="text-foreground">Obligatorios:</strong> Empresa, Sucursal, Tipo de equipo y Estado. Marca, modelo, número de serie y fechas son opcionales. Para &quot;Equipo de computo&quot; no se pide marca ni modelo.
+          </p>
           {error && (
-            <div className="bg-destructive/10 text-destructive px-4 py-3 rounded-lg text-sm border border-destructive/20">
+            <div
+              ref={errorRef}
+              role="alert"
+              className="bg-destructive/10 text-destructive px-4 py-3 rounded-lg text-sm border border-destructive/20"
+            >
               {error}
             </div>
           )}
@@ -615,7 +622,7 @@ export function EquipoForm({
 
           {/* Estado */}
           <div className="space-y-2">
-            <Label htmlFor="estado">Estado</Label>
+            <Label htmlFor="estado">Estado <span className="text-destructive">*</span></Label>
             <Select value={formData.estado} onValueChange={(value) => setFormData({ ...formData, estado: value })}>
               <SelectTrigger id="estado">
                 <SelectValue />
