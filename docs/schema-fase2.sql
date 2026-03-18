@@ -2,10 +2,11 @@
 -- Color Center Management - Fase 2 (bases que YA tienen schema.sql)
 -- =====================================================================
 -- Ejecutar UNA VEZ en cada base Color Center que ya creaste con schema.sql.
--- Añade: usuarios (rol_id, empresa_id, zona_ids), mantenimientos, marca_tipo_equipo, seed.
---
--- Roles: rol_id en app → 1=Escritura, 2=Admin, 3=Lectura (sin cat_roles).
--- Zonas: usuarios.zona_ids (0=Todas; varios NumZona comun separados por coma: 1,2,3).
+-- Añade: columnas/tablas para mantenimientos, marca_tipo_equipo, seed.
+-- Nota: Login y roles están en Auth0. Las secciones que tocan tabla usuarios
+--       (rol_id, empresa_id, zona_ids) solo aplican si mantienes esa tabla
+--       para FKs (reportado_por_id, tecnico_id, etc.); si borraste usuarios,
+--       omite o adapta esas partes.
 -- =====================================================================
 
 

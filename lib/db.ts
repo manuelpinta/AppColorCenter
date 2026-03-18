@@ -1,5 +1,7 @@
 import mysql from "mysql2/promise"
 import { EMPRESA_IDS, EMPRESA_TO_ENV_KEY, type EmpresaId } from "@/lib/empresas-config"
+import { getCachedAllowedEmpresaIds } from "@/lib/allowed-empresas-context"
+import { userHasRole } from "@/lib/auth-roles"
 
 export { EMPRESA_IDS, type EmpresaId }
 
@@ -115,6 +117,37 @@ export async function queryAllBases<T>(
 /** Lista de empresaIds que tienen base configurada. */
 export function getConfiguredEmpresaIds(): EmpresaId[] {
   return EMPRESA_IDS.filter((eid) => getUrlForEmpresa(eid) != null)
+}
+
+/**
+ * EmpresaIds que la capa de datos debe usar en este request.
+ * Si hay contexto de Auth0 Organizations (cached), devuelve la intersección con las configuradas.
+ * Si no, devuelve getConfiguredEmpresaIds() (comportamiento anterior).
+ */
+/** Orden determinista (emp-1, emp-2, ...) para evitar hydration mismatch. */
+export async function getEmpresaIdsForDataLayer(): Promise<EmpresaId[]> {
+  // Soporte Central actúa como admin: sin importar Organizations, ve y escribe en todas las empresas configuradas.
+  if (await userHasRole("soporte-central")) {
+    return [...getConfiguredEmpresaIds()].sort((a, b) => a.localeCompare(b))
+  }
+
+  const allowed = await getCachedAllowedEmpresaIds()
+  const configured = getConfiguredEmpresaIds()
+  const list = allowed === null || allowed.length === 0 ? configured : allowed.filter((eid) => getUrlForEmpresa(eid) != null)
+  return [...list].sort((a, b) => a.localeCompare(b))
+}
+
+/**
+ * Comprueba si la empresa está permitida para el usuario actual (Auth0 orgs o todas si no aplica).
+ * Usar en rutas API y Server Actions antes de getPool(empresaId).
+ */
+export async function isEmpresaAllowedForRequest(empresaId: string): Promise<boolean> {
+  if (await userHasRole("soporte-central")) {
+    return true
+  }
+
+  const allowed = await getEmpresaIdsForDataLayer()
+  return allowed.includes(empresaId as EmpresaId)
 }
 
 /** Empresa que es maestro de catálogos (solo ahí se escriben; se replica al resto). Por defecto Pintacomex = emp-1. */

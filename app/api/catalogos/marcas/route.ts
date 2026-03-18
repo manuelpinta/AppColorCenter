@@ -1,13 +1,17 @@
 import { NextRequest, NextResponse } from "next/server"
-import { getPool, getCatalogoMaestroEmpresaId, getEmpresaIdForCatalogRead } from "@/lib/db"
+import { getPool, getCatalogoMaestroEmpresaId, getEmpresaIdForCatalogRead, isEmpresaAllowedForRequest } from "@/lib/db"
 import { getMarcasEquipo, getMarcasEquipoParaAdmin, crearMarca } from "@/lib/data/catalogos"
 import { syncMarcaToOtrasBases } from "@/lib/data/catalogos-sync"
+import { userHasRole } from "@/lib/auth-roles"
 
 /** Lista marcas. ?empresa_id=emp-1 para leer de esa empresa (país/contexto); si no, maestro. ?incluir_inactivos=1 para admin. */
 export async function GET(request: NextRequest) {
   try {
     const empresaParam = request.nextUrl.searchParams.get("empresa_id")
     const empresaId = getEmpresaIdForCatalogRead(empresaParam)
+    if (!(await isEmpresaAllowedForRequest(empresaId))) {
+      return NextResponse.json({ error: "No tienes acceso a esta empresa" }, { status: 403 })
+    }
     const pool = await getPool(empresaId)
     const incluirInactivos = request.nextUrl.searchParams.get("incluir_inactivos") === "1"
     const items = incluirInactivos
@@ -25,6 +29,9 @@ export async function GET(request: NextRequest) {
 
 /** Crea una marca en el maestro (Pintacomex) y replica a las demás bases. */
 export async function POST(request: NextRequest) {
+  if (!(await userHasRole("soporte-central"))) {
+    return NextResponse.json({ error: "No tienes permisos para gestionar marcas" }, { status: 403 })
+  }
   let body: { nombre?: string }
   try {
     body = await request.json()
@@ -38,6 +45,9 @@ export async function POST(request: NextRequest) {
 
   try {
     const empresaId = getCatalogoMaestroEmpresaId()
+    if (!(await isEmpresaAllowedForRequest(empresaId))) {
+      return NextResponse.json({ error: "No tienes acceso a esta empresa" }, { status: 403 })
+    }
     const pool = await getPool(empresaId)
     const created = await crearMarca(pool, nombre)
     await syncMarcaToOtrasBases(Number(created.id), created.nombre)

@@ -1,13 +1,17 @@
 import { NextRequest, NextResponse } from "next/server"
-import { getPool, getCatalogoMaestroEmpresaId } from "@/lib/db"
+import { getPool, getCatalogoMaestroEmpresaId, isEmpresaAllowedForRequest } from "@/lib/db"
 import { actualizarTipoEquipo, getTipoEquipoById } from "@/lib/data/catalogos"
 import { updateCatTipoEquipoInOtrasBases } from "@/lib/data/catalogos-sync"
+import { userHasRole } from "@/lib/auth-roles"
 
 /** Actualiza un tipo de equipo en el maestro y replica. Body: { nombre?: string, activo?: number } (activo 0 o 1). */
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  if (!(await userHasRole("soporte-central"))) {
+    return NextResponse.json({ error: "No tienes permisos para gestionar tipos de equipo" }, { status: 403 })
+  }
   const { id } = await params
   if (!id) {
     return NextResponse.json({ error: "id requerido" }, { status: 400 })
@@ -29,6 +33,9 @@ export async function PATCH(
 
   try {
     const empresaId = getCatalogoMaestroEmpresaId()
+    if (!(await isEmpresaAllowedForRequest(empresaId))) {
+      return NextResponse.json({ error: "No tienes acceso a esta empresa" }, { status: 403 })
+    }
     const pool = await getPool(empresaId)
     await actualizarTipoEquipo(pool, id, data)
     const row = await getTipoEquipoById(pool, id)

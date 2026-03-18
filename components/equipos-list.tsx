@@ -7,9 +7,10 @@ import Link from "next/link"
 interface EquiposListProps {
   equipos: Equipo[]
   colorCenterId: string
+  canWrite: boolean
 }
 
-export function EquiposList({ equipos, colorCenterId }: EquiposListProps) {
+export function EquiposList({ equipos, colorCenterId, canWrite }: EquiposListProps) {
   const getEstadoBadge = (estado: string) => {
     switch (estado) {
       case "Operativo":
@@ -59,9 +60,11 @@ export function EquiposList({ equipos, colorCenterId }: EquiposListProps) {
         <WrenchIcon className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
         <h3 className="text-lg font-semibold text-foreground mb-2">No hay equipos registrados</h3>
         <p className="text-muted-foreground mb-4">Comienza agregando el primer equipo a este Color Center</p>
-        <Link href={`/equipos/crear?color_center_id=${colorCenterId}`}>
-          <Button>Agregar Equipo</Button>
-        </Link>
+        {canWrite && (
+          <Link href={`/equipos/crear?color_center_id=${colorCenterId}`}>
+            <Button>Agregar Equipo</Button>
+          </Link>
+        )}
       </div>
     )
   }
@@ -140,11 +143,13 @@ export function EquiposList({ equipos, colorCenterId }: EquiposListProps) {
                   Ver detalles
                 </Button>
               </Link>
-              <Link href={`/mantenimientos/crear?equipo_id=${equipo.id}`} className="flex-1 sm:flex-none">
-                <Button variant="outline" size="sm" className="w-full bg-transparent">
-                  Reportar falla
-                </Button>
-              </Link>
+              {canWrite && (
+                <Link href={`/mantenimientos/crear?equipo_id=${equipo.id}`} className="flex-1 sm:flex-none">
+                  <Button variant="outline" size="sm" className="w-full bg-transparent">
+                    Reportar falla
+                  </Button>
+                </Link>
+              )}
             </div>
           </div>
         </div>

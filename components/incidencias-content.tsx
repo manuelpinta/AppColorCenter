@@ -14,6 +14,7 @@ interface IncidenciasContentProps {
   incidencias: IncidenciaWithEmpresa[]
   colorCenters: ColorCenter[]
   equipos: EquipoWithEmpresa[]
+  canWrite: boolean
 }
 
 function findColorCenter(inc: IncidenciaWithEmpresa, colorCenters: ColorCenter[]): ColorCenter | undefined {
@@ -29,6 +30,7 @@ export function IncidenciasContent({
   incidencias,
   colorCenters,
   equipos,
+  canWrite,
 }: IncidenciasContentProps) {
   const [search, setSearch] = useState("")
 
@@ -58,12 +60,14 @@ export function IncidenciasContent({
             Incidencias ({filteredIncidencias.length}
             {filteredIncidencias.length !== incidencias.length ? ` de ${incidencias.length}` : ""})
           </CardTitle>
-          <Link href="/incidencias/crear">
-            <Button size="sm">
-              <AlertTriangle className="h-4 w-4 mr-2" />
-              Reportar incidencia
-            </Button>
-          </Link>
+          {canWrite && (
+            <Link href="/incidencias/crear">
+              <Button size="sm">
+                <AlertTriangle className="h-4 w-4 mr-2" />
+                Reportar incidencia
+              </Button>
+            </Link>
+          )}
         </div>
 
         <div className="flex flex-col gap-3 w-full">
@@ -83,6 +87,7 @@ export function IncidenciasContent({
           incidencias={filteredIncidencias}
           colorCenters={colorCenters}
           equipos={equipos}
+          canWrite={canWrite}
         />
       </CardContent>
     </Card>

@@ -15,6 +15,7 @@ interface MantenimientosTableProps {
   mantenimientos: MantenimientoWithEmpresa[]
   equipos: EquipoWithEmpresa[]
   colorCenters: ColorCenter[]
+  canWrite: boolean
 }
 
 function findEquipo(mant: MantenimientoWithEmpresa, equipos: EquipoWithEmpresa[]): EquipoWithEmpresa | undefined {
@@ -29,7 +30,7 @@ function getSucursalKey(equipo: EquipoWithEmpresa): string {
   return equipo.empresa_id ? `${equipo.empresa_id}-${equipo.color_center_id}` : equipo.color_center_id
 }
 
-export function MantenimientosTable({ mantenimientos, equipos, colorCenters }: MantenimientosTableProps) {
+export function MantenimientosTable({ mantenimientos, equipos, colorCenters, canWrite }: MantenimientosTableProps) {
   const [filterTipo, setFilterTipo] = useState<Set<string> | null>(null)
   const [filterEstado, setFilterEstado] = useState<Set<string> | null>(null)
   const [filterSucursalKey, setFilterSucursalKey] = useState<Set<string> | null>(null)
@@ -144,9 +145,11 @@ export function MantenimientosTable({ mantenimientos, equipos, colorCenters }: M
         <Clock className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
         <h3 className="text-lg font-semibold text-foreground mb-2">No hay mantenimientos registrados</h3>
         <p className="text-muted-foreground mb-4">Comienza registrando el primer mantenimiento</p>
-        <Link href="/mantenimientos/crear">
-          <Button>Registrar Mantenimiento</Button>
-        </Link>
+        {canWrite && (
+          <Link href="/mantenimientos/crear">
+            <Button>Registrar Mantenimiento</Button>
+          </Link>
+        )}
       </div>
     )
   }

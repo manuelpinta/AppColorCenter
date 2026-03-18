@@ -1,7 +1,7 @@
 import type { Pool } from "mysql2/promise"
 import type { Incidencia, EstadoIncidencia, SeveridadIncidencia, IncidenciaWithEmpresa } from "@/lib/types"
 import type { EmpresaId } from "@/lib/db"
-import { getPool, getConfiguredEmpresaIds, EMPRESA_IDS } from "@/lib/db"
+import { getPool, getEmpresaIdsForDataLayer, EMPRESA_IDS } from "@/lib/db"
 import { getNombreUsuarioById, getDefaultUsuarioId } from "./usuarios"
 import { timed, withTimeout, getEmpresaQueryTimeoutMs } from "./timing"
 import { getCachedIf } from "./cache"
@@ -146,7 +146,7 @@ async function getIncidenciasAllBasesUncached(): Promise<{
   data: IncidenciaWithEmpresa[]
   shouldCache: boolean
 }> {
-  const ids = getConfiguredEmpresaIds()
+  const ids = await getEmpresaIdsForDataLayer()
   const timeoutMs = getEmpresaQueryTimeoutMs()
   let hadTimeout = false
   const arrays = await Promise.all(
@@ -198,7 +198,7 @@ export async function findIncidenciaInAllBases(
   id: string
 ): Promise<{ incidencia: Incidencia; pool: Pool; empresaId: EmpresaId } | null> {
   const { empresaId: onlyEmpresa, numericId } = parseIncidenciaId(id)
-  const idsToTry = onlyEmpresa ? [onlyEmpresa] : getConfiguredEmpresaIds()
+  const idsToTry = onlyEmpresa ? [onlyEmpresa] : await getEmpresaIdsForDataLayer()
   for (const empresaId of idsToTry) {
     const pool = await getPool(empresaId)
     const inc = await getIncidenciaById(pool, numericId)

@@ -2,7 +2,7 @@
 
 Esquema normalizado para **MySQL 8.0+**. Todas las FK apuntan a catálogos o tablas relacionadas (sin CHECK constraints para valores).
 
-Para bases nuevas: usar **schema.sql** para crear todas las tablas; luego **schema-fase2.sql** para columnas y tablas del MVP (usuarios/roles, marcas por tipo). Ver `docs/README.md` para índice de documentación.
+Para bases nuevas: usar **schema.sql** para crear todas las tablas; luego **schema-fase2.sql** para tablas/columnas del MVP (marcas por tipo, etc.). Login y usuarios están en **Auth0** (ver Auth0Setup.md, Auth0RolesYOrganizaciones.md). Ver `docs/README.md` para índice de documentación.
 
 ---
 

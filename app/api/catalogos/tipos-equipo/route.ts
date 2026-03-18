@@ -1,12 +1,16 @@
 import { NextRequest, NextResponse } from "next/server"
-import { getPool, getCatalogoMaestroEmpresaId, getEmpresaIdForCatalogRead } from "@/lib/db"
+import { getPool, getCatalogoMaestroEmpresaId, getEmpresaIdForCatalogRead, isEmpresaAllowedForRequest } from "@/lib/db"
 import { getCatalogoNombres, getTiposEquipoParaAdmin, crearTipoEquipo } from "@/lib/data/catalogos"
 import { syncCatTipoEquipoToOtrasBases } from "@/lib/data/catalogos-sync"
+import { userHasRole } from "@/lib/auth-roles"
 
 /** Lista tipos de equipo. ?empresa_id=emp-1 para leer de esa empresa; ?incluir_inactivos=1 para admin. */
 export async function GET(request: NextRequest) {
   try {
     const empresaId = getEmpresaIdForCatalogRead(request.nextUrl.searchParams.get("empresa_id"))
+    if (!(await isEmpresaAllowedForRequest(empresaId))) {
+      return NextResponse.json({ error: "No tienes acceso a esta empresa" }, { status: 403 })
+    }
     const pool = await getPool(empresaId)
     const incluirInactivos = request.nextUrl.searchParams.get("incluir_inactivos") === "1"
     const items = incluirInactivos
@@ -28,6 +32,9 @@ export async function GET(request: NextRequest) {
 
 /** Crea un tipo de equipo en el maestro (Pintacomex) y replica a las demás bases. */
 export async function POST(request: NextRequest) {
+  if (!(await userHasRole("soporte-central"))) {
+    return NextResponse.json({ error: "No tienes permisos para gestionar tipos de equipo" }, { status: 403 })
+  }
   let body: { nombre?: string }
   try {
     body = await request.json()
@@ -41,6 +48,9 @@ export async function POST(request: NextRequest) {
 
   try {
     const empresaId = getCatalogoMaestroEmpresaId()
+    if (!(await isEmpresaAllowedForRequest(empresaId))) {
+      return NextResponse.json({ error: "No tienes acceso a esta empresa" }, { status: 403 })
+    }
     const pool = await getPool(empresaId)
     const created = await crearTipoEquipo(pool, nombre)
     await syncCatTipoEquipoToOtrasBases(Number(created.id), created.nombre)

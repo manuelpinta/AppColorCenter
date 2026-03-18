@@ -2,17 +2,18 @@
  * Sincronización de catálogos desde el maestro a las demás bases Color Center.
  * Regla: mismo id en todas las BDs para que las FK (equipos.marca_id, etc.) sigan válidas.
  */
-import { getPool, getConfiguredEmpresaIds, getCatalogoMaestroEmpresaId } from "@/lib/db"
+import { getPool, getEmpresaIdsForDataLayer, getCatalogoMaestroEmpresaId } from "@/lib/db"
 import type { EmpresaId } from "@/lib/db"
 
-function getOtrasEmpresasParaSync(): EmpresaId[] {
+async function getOtrasEmpresasParaSync(): Promise<EmpresaId[]> {
   const master = getCatalogoMaestroEmpresaId()
-  return getConfiguredEmpresaIds().filter((eid) => eid !== master)
+  const ids = await getEmpresaIdsForDataLayer()
+  return ids.filter((eid) => eid !== master)
 }
 
 /** Replica una marca al resto de las bases (mismo id). Idempotente: ON DUPLICATE KEY UPDATE. */
 export async function syncMarcaToOtrasBases(id: number, nombre: string): Promise<void> {
-  const otras = getOtrasEmpresasParaSync()
+  const otras = await getOtrasEmpresasParaSync()
   for (const empresaId of otras) {
     const pool = await getPool(empresaId)
     await pool.query(
@@ -28,7 +29,7 @@ export async function syncModeloToOtrasBases(
   marca_id: number,
   nombre: string
 ): Promise<void> {
-  const otras = getOtrasEmpresasParaSync()
+  const otras = await getOtrasEmpresasParaSync()
   for (const empresaId of otras) {
     const pool = await getPool(empresaId)
     await pool.query(
@@ -40,7 +41,7 @@ export async function syncModeloToOtrasBases(
 
 /** Replica un arrendador al resto de las bases (mismo id). */
 export async function syncArrendadorToOtrasBases(id: number, nombre: string): Promise<void> {
-  const otras = getOtrasEmpresasParaSync()
+  const otras = await getOtrasEmpresasParaSync()
   for (const empresaId of otras) {
     const pool = await getPool(empresaId)
     await pool.query(
@@ -52,7 +53,7 @@ export async function syncArrendadorToOtrasBases(id: number, nombre: string): Pr
 
 /** Replica un tipo de equipo (cat_tipos_equipo) al resto de las bases (mismo id). */
 export async function syncCatTipoEquipoToOtrasBases(id: number, nombre: string): Promise<void> {
-  const otras = getOtrasEmpresasParaSync()
+  const otras = await getOtrasEmpresasParaSync()
   for (const empresaId of otras) {
     const pool = await getPool(empresaId)
     await pool.query(
@@ -68,7 +69,7 @@ export async function updateMarcaInOtrasBases(
   nombre: string,
   activo: number
 ): Promise<void> {
-  const otras = getOtrasEmpresasParaSync()
+  const otras = await getOtrasEmpresasParaSync()
   for (const empresaId of otras) {
     const pool = await getPool(empresaId)
     await pool.query("UPDATE marcas_equipo SET nombre = ?, activo = ? WHERE id = ?", [
@@ -86,7 +87,7 @@ export async function updateModeloInOtrasBases(
   nombre: string,
   activo: number
 ): Promise<void> {
-  const otras = getOtrasEmpresasParaSync()
+  const otras = await getOtrasEmpresasParaSync()
   for (const empresaId of otras) {
     const pool = await getPool(empresaId)
     await pool.query(
@@ -102,7 +103,7 @@ export async function updateArrendadorInOtrasBases(
   nombre: string,
   activo: number
 ): Promise<void> {
-  const otras = getOtrasEmpresasParaSync()
+  const otras = await getOtrasEmpresasParaSync()
   for (const empresaId of otras) {
     const pool = await getPool(empresaId)
     await pool.query("UPDATE arrendadores SET nombre = ?, activo = ? WHERE id = ?", [
@@ -119,7 +120,7 @@ export async function updateCatTipoEquipoInOtrasBases(
   nombre: string,
   activo: number
 ): Promise<void> {
-  const otras = getOtrasEmpresasParaSync()
+  const otras = await getOtrasEmpresasParaSync()
   for (const empresaId of otras) {
     const pool = await getPool(empresaId)
     await pool.query("UPDATE cat_tipos_equipo SET nombre = ?, activo = ? WHERE id = ?", [

@@ -14,6 +14,7 @@ import type { EquipoWithEmpresa } from "@/lib/types"
 interface EquiposContentProps {
   equipos: EquipoWithEmpresa[]
   colorCenters: ColorCenter[]
+  canWrite: boolean
 }
 
 function findColorCenter(equipo: EquipoWithEmpresa, colorCenters: ColorCenter[]): ColorCenter | undefined {
@@ -24,7 +25,7 @@ function findColorCenter(equipo: EquipoWithEmpresa, colorCenters: ColorCenter[])
 
 const DIAS_POR_VENCER = 90
 
-export function EquiposContent({ equipos, colorCenters }: EquiposContentProps) {
+export function EquiposContent({ equipos, colorCenters, canWrite }: EquiposContentProps) {
   const [search, setSearch] = useState("")
   const [sucursalId, setSucursalId] = useState("all")
   const [propiedad, setPropiedad] = useState<"all" | "Propio" | "Arrendado">("all")
@@ -116,7 +117,7 @@ export function EquiposContent({ equipos, colorCenters }: EquiposContentProps) {
         </div>
       </CardHeader>
       <CardContent>
-        <EquiposTable equipos={filteredEquipos} colorCenters={colorCenters} />
+        <EquiposTable equipos={filteredEquipos} colorCenters={colorCenters} canWrite={canWrite} />
       </CardContent>
     </Card>
   )

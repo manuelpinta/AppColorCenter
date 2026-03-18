@@ -104,17 +104,18 @@ export function DashboardContent({
   const effectiveSortOrder = sortBy === null ? DEFAULT_SORT_ORDER : sortOrder
 
   const sortedCenters = useMemo(() => {
+    const locale = "en"
     const getEmpresaNombre = (id: string) => empresas.find((e) => e.id === id)?.nombre ?? ""
     const getEquiposCount = (c: ColorCenter) =>
       equipos.filter((e) => e.empresa_id === c.empresa_id && e.color_center_id === c.id).length
     const sorted = [...columnFilteredCenters].sort((a, b) => {
       let cmp = 0
       if (effectiveSortKey === "sucursal") {
-        cmp = (a.nombre_sucursal ?? "").localeCompare(b.nombre_sucursal ?? "")
+        cmp = (a.nombre_sucursal ?? "").localeCompare(b.nombre_sucursal ?? "", locale)
       } else if (effectiveSortKey === "empresa") {
-        cmp = getEmpresaNombre(a.empresa_id).localeCompare(getEmpresaNombre(b.empresa_id))
+        cmp = getEmpresaNombre(a.empresa_id).localeCompare(getEmpresaNombre(b.empresa_id), locale)
       } else if (effectiveSortKey === "region") {
-        cmp = (a.region ?? "").localeCompare(b.region ?? "")
+        cmp = (a.region ?? "").localeCompare(b.region ?? "", locale)
       } else if (effectiveSortKey === "equipos") {
         cmp = getEquiposCount(a) - getEquiposCount(b)
       }

@@ -15,6 +15,7 @@ interface IncidenciasTableProps {
   incidencias: IncidenciaWithEmpresa[]
   colorCenters: ColorCenter[]
   equipos: EquipoWithEmpresa[]
+  canWrite: boolean
 }
 
 function getSucursalKey(inc: IncidenciaWithEmpresa): string {
@@ -30,7 +31,7 @@ function findEquipo(inc: IncidenciaWithEmpresa, equipos: EquipoWithEmpresa[]): E
   return equipos.find((e) => e.empresa_id === inc.empresa_id && e.id === `${inc.empresa_id}-${inc.equipo_id}`)
 }
 
-export function IncidenciasTable({ incidencias, colorCenters, equipos }: IncidenciasTableProps) {
+export function IncidenciasTable({ incidencias, colorCenters, equipos, canWrite }: IncidenciasTableProps) {
   const [filterEstado, setFilterEstado] = useState<Set<string> | null>(null)
   const [filterSeveridad, setFilterSeveridad] = useState<Set<string> | null>(null)
   const [filterSucursalKey, setFilterSucursalKey] = useState<Set<string> | null>(null)
@@ -138,9 +139,11 @@ export function IncidenciasTable({ incidencias, colorCenters, equipos }: Inciden
         <AlertTriangle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
         <h3 className="text-lg font-semibold text-foreground mb-2">No hay incidencias</h3>
         <p className="text-muted-foreground mb-4">Los reportes de problema aparecerán aquí</p>
-        <Link href="/incidencias/crear">
-          <Button>Reportar incidencia</Button>
-        </Link>
+        {canWrite && (
+          <Link href="/incidencias/crear">
+            <Button>Reportar incidencia</Button>
+          </Link>
+        )}
       </div>
     )
   }

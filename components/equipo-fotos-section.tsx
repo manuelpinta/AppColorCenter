@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef, useCallback } from "react"
+import { useEffect, useState, useRef, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -14,9 +14,10 @@ import type { FotoEquipo } from "@/lib/types"
 interface EquipoFotosSectionProps {
   equipoId: string
   fotos: FotoEquipo[]
+  canWrite: boolean
 }
 
-export function EquipoFotosSection({ equipoId, fotos: initialFotos }: EquipoFotosSectionProps) {
+export function EquipoFotosSection({ equipoId, fotos: initialFotos, canWrite }: EquipoFotosSectionProps) {
   const router = useRouter()
   const [fotos, setFotos] = useState(initialFotos)
   const [showForm, setShowForm] = useState(false)
@@ -32,6 +33,11 @@ export function EquipoFotosSection({ equipoId, fotos: initialFotos }: EquipoFoto
   // Lightbox state
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null)
   const lightboxOpen = lightboxIndex !== null
+
+  // If user loses write permissions, keep UI consistent.
+  useEffect(() => {
+    if (!canWrite) setShowForm(false)
+  }, [canWrite])
 
   const openLightbox = (index: number) => setLightboxIndex(index)
   const closeLightbox = () => setLightboxIndex(null)
@@ -166,7 +172,9 @@ export function EquipoFotosSection({ equipoId, fotos: initialFotos }: EquipoFoto
         </CardHeader>
         <CardContent className="space-y-4">
           {fotos.length === 0 && !showForm && (
-            <p className="text-sm text-muted-foreground py-4">Aún no hay fotos. Añade la primera para documentar el estado del equipo.</p>
+            <p className="text-sm text-muted-foreground py-4">
+              {canWrite ? "Aún no hay fotos. Añade la primera para documentar el estado del equipo." : "Aún no hay fotos."}
+            </p>
           )}
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -195,117 +203,121 @@ export function EquipoFotosSection({ equipoId, fotos: initialFotos }: EquipoFoto
                       <p className="text-white/90 text-xs mt-0.5">{foto.descripcion}</p>
                     )}
                   </div>
-                  <Button
-                    variant="destructive"
-                    size="icon"
-                    className="absolute top-2 right-2 h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      handleDelete(foto.id)
-                    }}
-                    disabled={deletingId === foto.id}
-                  >
-                    {deletingId === foto.id ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Trash2 className="h-4 w-4" />
-                    )}
-                  </Button>
+                  {canWrite && (
+                    <Button
+                      variant="destructive"
+                      size="icon"
+                      className="absolute top-2 right-2 h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleDelete(foto.id)
+                      }}
+                      disabled={deletingId === foto.id}
+                    >
+                      {deletingId === foto.id ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Trash2 className="h-4 w-4" />
+                      )}
+                    </Button>
+                  )}
                 </div>
               </div>
             ))}
           </div>
 
-          {showForm ? (
-            <form onSubmit={handleAdd} className="rounded-lg border border-dashed p-4 space-y-3">
-              {/* File upload area */}
-              <div className="space-y-2">
-                <Label>Imagen *</Label>
-                {!selectedFile ? (
-                  <div
-                    className="border-2 border-dashed rounded-lg p-6 text-center cursor-pointer hover:border-primary/50 hover:bg-muted/50 transition-colors"
-                    onClick={() => fileInputRef.current?.click()}
-                  >
-                    <Upload className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
-                    <p className="text-sm font-medium">Haz clic para seleccionar una imagen</p>
-                    <p className="text-xs text-muted-foreground mt-1">JPG, PNG, WebP hasta 10 MB</p>
-                  </div>
-                ) : (
-                  <div className="relative rounded-lg border overflow-hidden">
-                    <div className="aspect-video relative bg-muted">
-                      {previewUrl && (
-                        <img
-                          src={previewUrl}
-                          alt="Vista previa"
-                          className="w-full h-full object-contain"
-                        />
-                      )}
+          {canWrite ? (
+            showForm ? (
+              <form onSubmit={handleAdd} className="rounded-lg border border-dashed p-4 space-y-3">
+                {/* File upload area */}
+                <div className="space-y-2">
+                  <Label>Imagen *</Label>
+                  {!selectedFile ? (
+                    <div
+                      className="border-2 border-dashed rounded-lg p-6 text-center cursor-pointer hover:border-primary/50 hover:bg-muted/50 transition-colors"
+                      onClick={() => fileInputRef.current?.click()}
+                    >
+                      <Upload className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
+                      <p className="text-sm font-medium">Haz clic para seleccionar una imagen</p>
+                      <p className="text-xs text-muted-foreground mt-1">JPG, PNG, WebP hasta 10 MB</p>
                     </div>
-                    <div className="flex items-center justify-between p-2 bg-muted/50">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <ImageIcon className="h-4 w-4 text-muted-foreground shrink-0" />
-                        <span className="text-sm truncate">{selectedFile.name}</span>
-                        <span className="text-xs text-muted-foreground shrink-0">
-                          ({(selectedFile.size / 1024 / 1024).toFixed(1)} MB)
-                        </span>
+                  ) : (
+                    <div className="relative rounded-lg border overflow-hidden">
+                      <div className="aspect-video relative bg-muted">
+                        {previewUrl && (
+                          <img
+                            src={previewUrl}
+                            alt="Vista previa"
+                            className="w-full h-full object-contain"
+                          />
+                        )}
                       </div>
-                      <Button type="button" variant="ghost" size="sm" onClick={clearFile} className="shrink-0">
-                        Cambiar
-                      </Button>
+                      <div className="flex items-center justify-between p-2 bg-muted/50">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <ImageIcon className="h-4 w-4 text-muted-foreground shrink-0" />
+                          <span className="text-sm truncate">{selectedFile.name}</span>
+                          <span className="text-xs text-muted-foreground shrink-0">
+                            ({(selectedFile.size / 1024 / 1024).toFixed(1)} MB)
+                          </span>
+                        </div>
+                        <Button type="button" variant="ghost" size="sm" onClick={clearFile} className="shrink-0">
+                          Cambiar
+                        </Button>
+                      </div>
                     </div>
-                  </div>
-                )}
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={handleFileChange}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="foto-fecha">Fecha de la foto *</Label>
-                <Input
-                  id="foto-fecha"
-                  type="date"
-                  value={fechaFoto}
-                  onChange={(e) => setFechaFoto(e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="foto-desc">Descripción (opcional)</Label>
-                <Input
-                  id="foto-desc"
-                  value={descripcion}
-                  onChange={(e) => setDescripcion(e.target.value)}
-                  placeholder="Ej: Vista frontal, lateral derecho, detalle daño..."
-                />
-              </div>
-              {error && <p className="text-sm text-destructive">{error}</p>}
-              <div className="flex gap-2">
-                <Button type="submit" disabled={isSubmitting || !selectedFile}>
-                  {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Upload className="h-4 w-4 mr-2" />}
-                  Subir foto
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => {
-                    setShowForm(false)
-                    clearFile()
-                    setError(null)
-                  }}
-                >
-                  Cancelar
-                </Button>
-              </div>
-            </form>
-          ) : (
-            <Button variant="outline" onClick={() => setShowForm(true)} className="gap-2">
-              <Plus className="h-4 w-4" />
-              Añadir foto
-            </Button>
-          )}
+                  )}
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleFileChange}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="foto-fecha">Fecha de la foto *</Label>
+                  <Input
+                    id="foto-fecha"
+                    type="date"
+                    value={fechaFoto}
+                    onChange={(e) => setFechaFoto(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="foto-desc">Descripción (opcional)</Label>
+                  <Input
+                    id="foto-desc"
+                    value={descripcion}
+                    onChange={(e) => setDescripcion(e.target.value)}
+                    placeholder="Ej: Vista frontal, lateral derecho, detalle daño..."
+                  />
+                </div>
+                {error && <p className="text-sm text-destructive">{error}</p>}
+                <div className="flex gap-2">
+                  <Button type="submit" disabled={isSubmitting || !selectedFile}>
+                    {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Upload className="h-4 w-4 mr-2" />}
+                    Subir foto
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      setShowForm(false)
+                      clearFile()
+                      setError(null)
+                    }}
+                  >
+                    Cancelar
+                  </Button>
+                </div>
+              </form>
+            ) : (
+              <Button variant="outline" onClick={() => setShowForm(true)} className="gap-2">
+                <Plus className="h-4 w-4" />
+                Añadir foto
+              </Button>
+            )
+          ) : null}
         </CardContent>
       </Card>
 
@@ -380,20 +392,22 @@ export function EquipoFotosSection({ equipoId, fotos: initialFotos }: EquipoFoto
                   <span className="text-white/60 text-sm">
                     {lightboxIndex! + 1} / {fotos.length}
                   </span>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-red-400 hover:text-red-300 hover:bg-red-950/50"
-                    onClick={() => handleDelete(currentLightboxFoto.id)}
-                    disabled={deletingId === currentLightboxFoto.id}
-                  >
-                    {deletingId === currentLightboxFoto.id ? (
-                      <Loader2 className="h-4 w-4 animate-spin mr-1" />
-                    ) : (
-                      <Trash2 className="h-4 w-4 mr-1" />
-                    )}
-                    Eliminar
-                  </Button>
+                  {canWrite && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-red-400 hover:text-red-300 hover:bg-red-950/50"
+                      onClick={() => handleDelete(currentLightboxFoto.id)}
+                      disabled={deletingId === currentLightboxFoto.id}
+                    >
+                      {deletingId === currentLightboxFoto.id ? (
+                        <Loader2 className="h-4 w-4 animate-spin mr-1" />
+                      ) : (
+                        <Trash2 className="h-4 w-4 mr-1" />
+                      )}
+                      Eliminar
+                    </Button>
+                  )}
                 </div>
               </div>
             </div>

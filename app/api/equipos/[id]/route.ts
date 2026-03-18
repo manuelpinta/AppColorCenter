@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
-import { getPool } from "@/lib/db"
+import { getPool, isEmpresaAllowedForRequest } from "@/lib/db"
 import { actualizarEquipo, actualizarComputadora } from "@/lib/data"
 import type { Equipo } from "@/lib/types"
+import { userCanWrite } from "@/lib/auth-roles"
 
 const equipoAllowed = [
   "color_center_id", "tipo_equipo", "marca", "modelo", "numero_serie", "fecha_compra",
@@ -18,6 +19,10 @@ export async function PATCH(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  if (!(await userCanWrite())) {
+    return NextResponse.json({ error: "No tienes permisos para actualizar equipos" }, { status: 403 })
+  }
+
   const { id } = await params
   let body: Record<string, unknown>
   try {
@@ -31,6 +36,9 @@ export async function PATCH(
       { error: "empresa_id es requerido para actualizar equipo (multi-DB)" },
       { status: 400 }
     )
+  }
+  if (!(await isEmpresaAllowedForRequest(empresaId))) {
+    return NextResponse.json({ error: "No tienes acceso a esta empresa" }, { status: 403 })
   }
   const data: Record<string, unknown> = {}
   for (const key of equipoAllowed) {

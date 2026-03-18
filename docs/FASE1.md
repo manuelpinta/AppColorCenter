@@ -1,12 +1,12 @@
 # Fase 1 – Alcance y estado
 
 Resumen de lo implementado en Fase 1 y pendiente para fases posteriores.
-
+.\run-dev.cmd
 ---
 
 ## Incluido en Fase 1
 
-- **Multi-DB:** 5 empresas, cada una con base Color Center (`COLORCENTER_DB_URL_*`) para equipos, incidencias, mantenimientos, movimientos, fotos, usuarios, catálogos.
+- **Multi-DB:** 5 empresas, cada una con base Color Center (`COLORCENTER_DB_URL_*`) para equipos, incidencias, mantenimientos, movimientos, fotos, catálogos. Login y usuarios en Auth0.
 - **Sucursales desde comun:** Por empresa, base comun (`COMUN_DB_URL_*`) con tabla `sucursal`; filtro `FechaTerm = ''` y `SubTipoSuc IN ('S','B','2')`; opcional JOIN con tabla `zonas` (nombre de zona por env).
 - **Conexiones:** Pools con keepalive y timeout; retry ante ECONNRESET en lectura de sucursales desde comun; `clearComunPool()` para forzar reconexión.
 - **Equipos:** CRUD contra BD (crear, editar, mover); listados y detalle desde Color Center.

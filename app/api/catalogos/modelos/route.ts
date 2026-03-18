@@ -1,13 +1,17 @@
 import { NextRequest, NextResponse } from "next/server"
-import { getPool, getCatalogoMaestroEmpresaId, getEmpresaIdForCatalogRead } from "@/lib/db"
+import { getPool, getCatalogoMaestroEmpresaId, getEmpresaIdForCatalogRead, isEmpresaAllowedForRequest } from "@/lib/db"
 import { getModelosAll, getModelosAllParaAdmin, getModelosByMarca, crearModelo } from "@/lib/data/catalogos"
 import { syncModeloToOtrasBases } from "@/lib/data/catalogos-sync"
+import { userHasRole } from "@/lib/auth-roles"
 
 /** Lista modelos. ?empresa_id=emp-1 para leer de esa empresa; ?marca_id= filtrar; ?incluir_inactivos=1 para admin. */
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const empresaId = getEmpresaIdForCatalogRead(searchParams.get("empresa_id"))
+    if (!(await isEmpresaAllowedForRequest(empresaId))) {
+      return NextResponse.json({ error: "No tienes acceso a esta empresa" }, { status: 403 })
+    }
     const pool = await getPool(empresaId)
     const marcaId = searchParams.get("marca_id")
     const incluirInactivos = searchParams.get("incluir_inactivos") === "1"
@@ -28,6 +32,9 @@ export async function GET(request: NextRequest) {
 
 /** Crea un modelo en el maestro (Pintacomex) y replica a las demás bases. */
 export async function POST(request: NextRequest) {
+  if (!(await userHasRole("soporte-central"))) {
+    return NextResponse.json({ error: "No tienes permisos para gestionar modelos" }, { status: 403 })
+  }
   let body: { marca_id?: string; nombre?: string }
   try {
     body = await request.json()
@@ -45,6 +52,9 @@ export async function POST(request: NextRequest) {
 
   try {
     const empresaId = getCatalogoMaestroEmpresaId()
+    if (!(await isEmpresaAllowedForRequest(empresaId))) {
+      return NextResponse.json({ error: "No tienes acceso a esta empresa" }, { status: 403 })
+    }
     const pool = await getPool(empresaId)
     const created = await crearModelo(pool, marca_id, nombre)
     await syncModeloToOtrasBases(
