@@ -5,7 +5,7 @@ import {
   getPool,
   getComunPool,
   clearComunPool,
-  getConfiguredEmpresaIds,
+  getEmpresaIdsForDataLayer,
   hasComunForEmpresa,
   getSucursalesTableConfig,
   getZonasTableConfig,
@@ -184,7 +184,7 @@ export async function getSucursalesByEmpresaAndZona(
 
 /** Sucursales de todas las bases (sin cache). Timeout por empresa para no bloquear. Si hubo timeout, no cachear. */
 async function getColorCentersAllBasesUncached(): Promise<{ data: ColorCenter[]; shouldCache: boolean }> {
-  const ids = getConfiguredEmpresaIds()
+  const ids = await getEmpresaIdsForDataLayer()
   const timeoutMs = getEmpresaQueryTimeoutMs()
   let hadTimeout = false
   const arrays = await Promise.all(
@@ -204,12 +204,32 @@ async function getColorCentersAllBasesUncached(): Promise<{ data: ColorCenter[];
       )
     )
   )
-  return { data: arrays.flat(), shouldCache: !hadTimeout }
+  const flat = arrays.flat()
+  // Locale fijo para que servidor (Node) y cliente coincidan (evita que Ñ/acentos cambien el orden).
+  const locale = "en"
+  flat.sort((a, b) => {
+    const byEmpresa = a.empresa_id.localeCompare(b.empresa_id, locale)
+    if (byEmpresa !== 0) return byEmpresa
+    return (a.nombre_sucursal ?? "").localeCompare(b.nombre_sucursal ?? "", locale)
+  })
+  return { data: flat, shouldCache: !hadTimeout }
+}
+
+/** Orden estable para evitar hydration mismatch (mismo locale que servidor). */
+function sortColorCentersStable(list: ColorCenter[]): void {
+  const locale = "en"
+  list.sort((a, b) => {
+    const byEmpresa = a.empresa_id.localeCompare(b.empresa_id, locale)
+    if (byEmpresa !== 0) return byEmpresa
+    return (a.nombre_sucursal ?? "").localeCompare(b.nombre_sucursal ?? "", locale)
+  })
 }
 
 /** Sucursales de todas las bases (cada una con empresa_id). Cache corto solo cuando todas las empresas respondieron. */
 export async function getColorCentersAllBases(): Promise<ColorCenter[]> {
-  return getCachedIf("colorCentersAllBases", getColorCentersAllBasesUncached)
+  const data = await getCachedIf("colorCentersAllBases", getColorCentersAllBasesUncached)
+  sortColorCentersStable(data)
+  return data
 }
 
 /**
@@ -236,7 +256,7 @@ export async function getRegionesDisponibles(empresaId: EmpresaId): Promise<stri
 
 /** Regiones únicas de todas las bases (para filtros en listados). */
 export async function getRegionesDisponiblesAllBases(): Promise<string[]> {
-  const ids = getConfiguredEmpresaIds()
+  const ids = await getEmpresaIdsForDataLayer()
   const arrays = await Promise.all(ids.map((empresaId) => getRegionesDisponibles(empresaId)))
   const seen = new Set<string>()
   arrays.flat().forEach((r) => seen.add(r))
@@ -260,7 +280,7 @@ export async function getSucursalByCompositeId(
   id: string
 ): Promise<{ colorCenter: ColorCenter; pool: Pool; empresaId: EmpresaId } | null> {
   const { empresaId: onlyEmpresa, numericId } = parseSucursalId(id)
-  const idsToTry = onlyEmpresa ? [onlyEmpresa] : getConfiguredEmpresaIds()
+  const idsToTry = onlyEmpresa ? [onlyEmpresa] : await getEmpresaIdsForDataLayer()
   for (const empresaId of idsToTry) {
     const list = await getSucursalesByEmpresa(empresaId)
     const colorCenter = list.find((c) => c.id === numericId)

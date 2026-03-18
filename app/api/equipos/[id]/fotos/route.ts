@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
 import { findEquipoInAllBases, crearFotoEquipo, getEmpresaById } from "@/lib/data"
 import { getSupabaseServer, SUPABASE_BUCKET_FOTOS } from "@/lib/supabase"
+import { isEmpresaAllowedForRequest } from "@/lib/db"
+import { userCanWrite } from "@/lib/auth-roles"
 
 function sanitizeFileName(name: string): string {
   return name.replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 100)
@@ -10,12 +12,18 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  if (!(await userCanWrite())) {
+    return NextResponse.json({ error: "No tienes permisos para subir fotos" }, { status: 403 })
+  }
   const { id: equipoIdParam } = await params
   const found = await findEquipoInAllBases(equipoIdParam)
   if (!found) {
     return NextResponse.json({ error: "Equipo no encontrado" }, { status: 404 })
   }
   const { equipo, pool, empresaId } = found
+  if (!(await isEmpresaAllowedForRequest(empresaId))) {
+    return NextResponse.json({ error: "No tienes acceso a esta empresa" }, { status: 403 })
+  }
 
   const contentType = request.headers.get("content-type") ?? ""
   let url: string

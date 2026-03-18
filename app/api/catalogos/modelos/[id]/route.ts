@@ -1,13 +1,17 @@
 import { NextRequest, NextResponse } from "next/server"
-import { getPool, getCatalogoMaestroEmpresaId } from "@/lib/db"
+import { getPool, getCatalogoMaestroEmpresaId, isEmpresaAllowedForRequest } from "@/lib/db"
 import { actualizarModelo, getModeloById } from "@/lib/data/catalogos"
 import { updateModeloInOtrasBases } from "@/lib/data/catalogos-sync"
+import { userHasRole } from "@/lib/auth-roles"
 
 /** Actualiza un modelo en el maestro y replica. Body: { nombre?: string, marca_id?: string, activo?: number }. */
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  if (!(await userHasRole("soporte-central"))) {
+    return NextResponse.json({ error: "No tienes permisos para gestionar modelos" }, { status: 403 })
+  }
   const { id } = await params
   if (!id) {
     return NextResponse.json({ error: "id requerido" }, { status: 400 })
@@ -30,6 +34,9 @@ export async function PATCH(
 
   try {
     const empresaId = getCatalogoMaestroEmpresaId()
+    if (!(await isEmpresaAllowedForRequest(empresaId))) {
+      return NextResponse.json({ error: "No tienes acceso a esta empresa" }, { status: 403 })
+    }
     const pool = await getPool(empresaId)
     await actualizarModelo(pool, id, data)
     const row = await getModeloById(pool, id)

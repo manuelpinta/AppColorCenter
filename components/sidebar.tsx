@@ -2,8 +2,9 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { LayoutDashboard, Building2, Wrench, ClipboardList, AlertTriangle, BarChart3 } from "lucide-react"
+import { LayoutDashboard, Building2, Wrench, ClipboardList, AlertTriangle, BarChart3, LogOut, LogIn } from "lucide-react"
 import { cn } from "@/lib/utils"
+import type { SessionForClient } from "@/components/app-shell"
 
 // Enlaces visibles en el sidebar (Admin catálogos queda oculto; accesible solo por URL directa /admin/catalogos)
 const navigation = [
@@ -15,7 +16,7 @@ const navigation = [
   { name: "Reportes", short: "Report.", href: "/reportes", icon: BarChart3 },
 ]
 
-export function Sidebar() {
+export function Sidebar({ session }: { session: SessionForClient }) {
   const pathname = usePathname()
 
   return (
@@ -56,14 +57,46 @@ export function Sidebar() {
             })}
           </nav>
 
-          {/* Footer */}
-          <div className="px-6 py-4 border-t border-border">
-            <p className="text-xs text-muted-foreground">Sistema de Control Técnico</p>
+          {/* Footer: sesión Auth0 */}
+          <div className="px-6 py-4 border-t border-border space-y-2">
+            {session?.user ? (
+              <>
+                <p className="text-xs text-muted-foreground truncate" title={session.user.email ?? undefined}>
+                  {session.user.email ?? session.user.name ?? "Conectado"}
+                </p>
+                <a
+                  href="/auth/logout"
+                  className="flex items-center gap-2 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  <LogOut className="h-3.5 w-3.5" />
+                  Cerrar sesión
+                </a>
+              </>
+            ) : (
+              <Link
+                href="/login"
+                className="flex items-center gap-2 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <LogIn className="h-3.5 w-3.5" />
+                Iniciar sesión
+              </Link>
+            )}
+            <p className="text-xs text-muted-foreground pt-1">Sistema de Control Técnico</p>
           </div>
         </div>
       </aside>
 
       <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-card border-t border-border shadow-lg safe-area-inset-bottom">
+        {session?.user ? (
+          <div className="px-2 py-1 flex items-center justify-between text-[10px] text-muted-foreground border-b border-border">
+            <span className="truncate flex-1">{session.user.email ?? session.user.name ?? "Conectado"}</span>
+            <a href="/auth/logout" className="shrink-0 px-2 py-0.5 rounded hover:bg-secondary">Salir</a>
+          </div>
+        ) : (
+          <div className="px-2 py-1 text-center border-b border-border">
+            <Link href="/login" className="text-[10px] font-medium text-muted-foreground hover:text-foreground">Iniciar sesión</Link>
+          </div>
+        )}
         <div className="flex items-center justify-around px-1 py-2">
           {navigation.map((item) => {
             const isActive = pathname === item.href

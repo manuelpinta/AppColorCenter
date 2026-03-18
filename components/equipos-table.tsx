@@ -14,6 +14,7 @@ import { TableSortHeader, type SortOrder } from "@/components/table-sort-header"
 interface EquiposTableProps {
   equipos: EquipoWithEmpresa[]
   colorCenters: ColorCenter[]
+  canWrite: boolean
 }
 
 function getColorCenterKey(cc: ColorCenter): string {
@@ -24,7 +25,7 @@ function getEquipoSucursalKey(eq: EquipoWithEmpresa): string {
   return eq.empresa_id ? `${eq.empresa_id}-${eq.color_center_id}` : eq.color_center_id
 }
 
-export function EquiposTable({ equipos, colorCenters }: EquiposTableProps) {
+export function EquiposTable({ equipos, colorCenters, canWrite }: EquiposTableProps) {
   const colorCenterMap = new Map(colorCenters.map((cc) => [getColorCenterKey(cc), cc]))
 
   const [filterTipo, setFilterTipo] = useState<Set<string> | null>(null)
@@ -120,9 +121,11 @@ export function EquiposTable({ equipos, colorCenters }: EquiposTableProps) {
         <WrenchIcon className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
         <h3 className="text-lg font-semibold text-foreground mb-2">No hay equipos registrados</h3>
         <p className="text-muted-foreground mb-4">Comienza agregando tu primer equipo</p>
-        <Link href="/equipos/crear">
-          <Button>Agregar Equipo</Button>
-        </Link>
+        {canWrite && (
+          <Link href="/equipos/crear">
+            <Button>Agregar Equipo</Button>
+          </Link>
+        )}
       </div>
     )
   }

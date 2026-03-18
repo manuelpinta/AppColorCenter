@@ -1,6 +1,6 @@
 import type { Pool } from "mysql2/promise"
 import type { Equipo } from "@/lib/types"
-import { getPool, getConfiguredEmpresaIds, EMPRESA_IDS, clearPool } from "@/lib/db"
+import { getPool, getEmpresaIdsForDataLayer, EMPRESA_IDS, clearPool } from "@/lib/db"
 import type { EmpresaId } from "@/lib/db"
 import { buildEquipoCompositeId as buildEquipoCompositeIdImpl, parseEquipoId as parseEquipoIdImpl } from "./ids"
 import { timed, withTimeout, getEmpresaQueryTimeoutMs } from "./timing"
@@ -94,7 +94,7 @@ export type { EquipoWithEmpresa } from "@/lib/types"
 
 /** Lista equipos de todas las bases (sin cache). Timeout por empresa; reintento por empresa si ECONNRESET. Si hubo timeout, no cachear. */
 async function getEquiposAllBasesUncached(): Promise<{ data: EquipoWithEmpresa[]; shouldCache: boolean }> {
-  const ids = getConfiguredEmpresaIds()
+  const ids = await getEmpresaIdsForDataLayer()
   const timeoutMs = getEmpresaQueryTimeoutMs()
   let hadTimeout = false
   const arrays = await Promise.all(
@@ -158,7 +158,7 @@ export async function findEquipoInAllBases(
   equipoId: string
 ): Promise<{ equipo: Equipo; pool: Pool; empresaId: EmpresaId } | null> {
   const { empresaId: onlyEmpresa, numericId } = parseEquipoId(equipoId)
-  const idsToTry = onlyEmpresa ? [onlyEmpresa] : getConfiguredEmpresaIds()
+  const idsToTry = onlyEmpresa ? [onlyEmpresa] : await getEmpresaIdsForDataLayer()
   for (const empresaId of idsToTry) {
     const pool = await getPool(empresaId)
     const equipo = await getEquipoById(pool, numericId)

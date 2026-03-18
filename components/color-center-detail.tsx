@@ -24,6 +24,7 @@ interface ColorCenterDetailProps {
   incidencias: Incidencia[]
   /** Id a usar en enlaces (crear equipo, incidencia, etc.): compuesto o numérico. */
   sucursalIdForLinks: string
+  canWrite: boolean
 }
 
 export function ColorCenterDetail({
@@ -32,6 +33,7 @@ export function ColorCenterDetail({
   empresa,
   incidencias,
   sucursalIdForLinks,
+  canWrite,
 }: ColorCenterDetailProps) {
   const getEstadoBadgeColor = (estado: string) => {
     switch (estado) {
@@ -163,23 +165,27 @@ export function ColorCenterDetail({
               Equipos ({equipos.length})
             </CardTitle>
             <div className="flex flex-wrap gap-2">
-              <Link href={`/mantenimientos/crear?color_center_id=${sucursalIdForLinks}`}>
-                <Button size="sm" variant="outline" className="min-h-[44px] touch-manipulation">
-                  <Wrench className="h-4 w-4 mr-2" />
-                  Nuevo Mantenimiento
-                </Button>
-              </Link>
-              <Link href={`/equipos/crear?color_center_id=${sucursalIdForLinks}`}>
-                <Button size="sm" className="min-h-[44px] touch-manipulation">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Agregar Equipo
-                </Button>
-              </Link>
+              {canWrite && (
+                <>
+                  <Link href={`/mantenimientos/crear?color_center_id=${sucursalIdForLinks}`}>
+                    <Button size="sm" variant="outline" className="min-h-[44px] touch-manipulation">
+                      <Wrench className="h-4 w-4 mr-2" />
+                      Nuevo Mantenimiento
+                    </Button>
+                  </Link>
+                  <Link href={`/equipos/crear?color_center_id=${sucursalIdForLinks}`}>
+                    <Button size="sm" className="min-h-[44px] touch-manipulation">
+                      <Plus className="h-4 w-4 mr-2" />
+                      Agregar Equipo
+                    </Button>
+                  </Link>
+                </>
+              )}
             </div>
           </div>
         </CardHeader>
         <CardContent>
-          <EquiposList equipos={equipos} colorCenterId={sucursalIdForLinks} />
+          <EquiposList equipos={equipos} colorCenterId={sucursalIdForLinks} canWrite={canWrite} />
         </CardContent>
       </Card>
 
@@ -190,12 +196,14 @@ export function ColorCenterDetail({
               <AlertTriangle className="h-5 w-5" />
               Incidencias ({incidencias.length})
             </CardTitle>
-            <Link href={`/incidencias/crear?sucursal_id=${sucursalIdForLinks}`}>
-              <Button size="sm" variant="outline" className="min-h-[44px] touch-manipulation">
-                <AlertTriangle className="h-4 w-4 mr-2" />
-                Reportar incidencia
-              </Button>
-            </Link>
+            {canWrite && (
+              <Link href={`/incidencias/crear?sucursal_id=${sucursalIdForLinks}`}>
+                <Button size="sm" variant="outline" className="min-h-[44px] touch-manipulation">
+                  <AlertTriangle className="h-4 w-4 mr-2" />
+                  Reportar incidencia
+                </Button>
+              </Link>
+            )}
           </div>
         </CardHeader>
         <CardContent>

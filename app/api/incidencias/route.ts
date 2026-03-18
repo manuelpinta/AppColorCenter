@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server"
-import { getPool } from "@/lib/db"
+import { getPool, isEmpresaAllowedForRequest } from "@/lib/db"
 import { crearIncidencia } from "@/lib/data"
 import { parseEquipoId } from "@/lib/data"
 import type { EstadoIncidencia, SeveridadIncidencia } from "@/lib/types"
+import { userCanWrite } from "@/lib/auth-roles"
 
 /** Parsea sucursal_id que puede ser compuesto (emp-1-5) o numérico. */
 function parseSucursalId(id: string): { empresaId: string; numericId: string } {
@@ -16,6 +17,10 @@ function parseSucursalId(id: string): { empresaId: string; numericId: string } {
 }
 
 export async function POST(request: NextRequest) {
+  if (!(await userCanWrite())) {
+    return NextResponse.json({ error: "No tienes permisos para crear incidencias" }, { status: 403 })
+  }
+
   let body: {
     sucursal_id: string
     equipo_id?: string | null
@@ -67,6 +72,9 @@ export async function POST(request: NextRequest) {
   if (equipo_id) {
     const parsed = parseEquipoId(equipo_id)
     equipoNumericId = parsed.numericId
+  }
+  if (!(await isEmpresaAllowedForRequest(empresaIdToUse))) {
+    return NextResponse.json({ error: "No tienes acceso a esta empresa" }, { status: 403 })
   }
   try {
     const pool = await getPool(empresaIdToUse)

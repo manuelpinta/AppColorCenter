@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server"
-import { getPool } from "@/lib/db"
+import { getPool, isEmpresaAllowedForRequest } from "@/lib/db"
 import { crearEquipo, parseEquipoId, buildEquipoCompositeId, actualizarComputadora } from "@/lib/data"
 import type { Equipo } from "@/lib/types"
 import type { EmpresaId } from "@/lib/db"
+import { userCanWrite } from "@/lib/auth-roles"
 
 const bodyAllowed = [
   "color_center_id",
@@ -21,6 +22,10 @@ const bodyAllowed = [
 ] as const
 
 export async function POST(request: NextRequest) {
+  if (!(await userCanWrite())) {
+    return NextResponse.json({ error: "No tienes permisos para crear equipos" }, { status: 403 })
+  }
+
   let body: Record<string, unknown>
   try {
     body = await request.json()
@@ -76,6 +81,10 @@ export async function POST(request: NextRequest) {
   }
 
   const computadoraPayload = body.computadora
+
+  if (!(await isEmpresaAllowedForRequest(empresaId))) {
+    return NextResponse.json({ error: "No tienes acceso a esta empresa" }, { status: 403 })
+  }
 
   try {
     const pool = await getPool(empresaId)

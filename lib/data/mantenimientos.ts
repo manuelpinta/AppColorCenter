@@ -1,7 +1,7 @@
 import type { Pool } from "mysql2/promise"
 import type { Mantenimiento, MantenimientoWithEmpresa } from "@/lib/types"
 import type { EmpresaId } from "@/lib/db"
-import { getPool, getConfiguredEmpresaIds, EMPRESA_IDS, clearPool } from "@/lib/db"
+import { getPool, getEmpresaIdsForDataLayer, EMPRESA_IDS, clearPool } from "@/lib/db"
 import { getNombreUsuarioById } from "./usuarios"
 import { timed, withTimeout, getEmpresaQueryTimeoutMs } from "./timing"
 import { getCachedIf } from "./cache"
@@ -111,7 +111,7 @@ async function getMantenimientosAllBasesUncached(): Promise<{
   data: MantenimientoWithEmpresa[]
   shouldCache: boolean
 }> {
-  const ids = getConfiguredEmpresaIds()
+  const ids = await getEmpresaIdsForDataLayer()
   const timeoutMs = getEmpresaQueryTimeoutMs()
   let hadTimeout = false
   const arrays = await Promise.all(
@@ -173,7 +173,7 @@ export async function findMantenimientoInAllBases(
   id: string
 ): Promise<{ mantenimiento: Mantenimiento; pool: Pool; empresaId: EmpresaId } | null> {
   const { empresaId: onlyEmpresa, numericId } = parseMantenimientoId(id)
-  const idsToTry = onlyEmpresa ? [onlyEmpresa] : getConfiguredEmpresaIds()
+  const idsToTry = onlyEmpresa ? [onlyEmpresa] : await getEmpresaIdsForDataLayer()
   for (const empresaId of idsToTry) {
     const pool = await getPool(empresaId)
     const mant = await getMantenimientoById(pool, numericId)

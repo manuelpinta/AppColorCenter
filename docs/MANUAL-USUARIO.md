@@ -8,7 +8,7 @@ Pasos para cada acción en la aplicación. Rutas y menús según la versión act
 
 - **Dónde:** pantalla de inicio de sesión (ruta `/login`).
 - **Cómo:** abrir la app; si no hay sesión, ir a **Inicio de sesión** o escribir en el navegador la URL de login. Ingresar **usuario o correo** y **contraseña**, luego **Iniciar sesión**.
-- **Nota:** si el inicio de sesión aún no está configurado (base común sin datos), la app mostrará un aviso.
+- **Nota:** el inicio de sesión es con Auth0; si no has configurado Auth0 (callback URLs, env), la app puede mostrar errores al intentar entrar.
 
 ---
 

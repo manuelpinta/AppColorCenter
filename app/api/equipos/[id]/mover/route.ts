@@ -1,11 +1,16 @@
 import { NextRequest, NextResponse } from "next/server"
-import { getPool } from "@/lib/db"
+import { getPool, isEmpresaAllowedForRequest } from "@/lib/db"
 import { registrarMovimientoEquipo, parseEquipoId } from "@/lib/data"
+import { userCanWrite } from "@/lib/auth-roles"
 
 export async function POST(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  if (!(await userCanWrite())) {
+    return NextResponse.json({ error: "No tienes permisos para mover equipos" }, { status: 403 })
+  }
+
   const { id: equipoIdParam } = await params
   const { empresaId: parsedEmpresaId, numericId } = parseEquipoId(equipoIdParam)
   const empresa_id = parsedEmpresaId
@@ -38,6 +43,9 @@ export async function POST(
       { error: "empresa_id es requerido (multi-DB) o usa id compuesto en la URL (ej. GALLCO-105-45)" },
       { status: 400 }
     )
+  }
+  if (!(await isEmpresaAllowedForRequest(empresaIdForPool))) {
+    return NextResponse.json({ error: "No tienes acceso a esta empresa" }, { status: 403 })
   }
   try {
     const pool = await getPool(empresaIdForPool)

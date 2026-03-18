@@ -12,6 +12,7 @@ interface MantenimientosContentProps {
   mantenimientos: MantenimientoWithEmpresa[]
   equipos: EquipoWithEmpresa[]
   colorCenters: ColorCenter[]
+  canWrite: boolean
 }
 
 function findEquipo(mant: MantenimientoWithEmpresa, equipos: EquipoWithEmpresa[]): EquipoWithEmpresa | undefined {
@@ -26,6 +27,7 @@ export function MantenimientosContent({
   mantenimientos,
   equipos,
   colorCenters,
+  canWrite,
 }: MantenimientosContentProps) {
   const [search, setSearch] = useState("")
 
@@ -75,6 +77,7 @@ export function MantenimientosContent({
           mantenimientos={filteredMantenimientos}
           equipos={equipos}
           colorCenters={colorCenters}
+          canWrite={canWrite}
         />
       </CardContent>
     </Card>
