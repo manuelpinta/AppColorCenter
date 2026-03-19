@@ -3,8 +3,9 @@ import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
 
 const PUBLIC_PATH = "/login"
+const ORG_ERROR_PATH = "/sin-empresa"
+const ROLES_ERROR_PATH = "/sin-rol"
 const AUTH_PREFIX = "/auth"
-const SESSION_COOKIE_NAME = "__session"
 
 /**
  * 1) Auth0 maneja /auth/* y sesión.
@@ -13,7 +14,7 @@ const SESSION_COOKIE_NAME = "__session"
  */
 export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname
-  const isPublic = pathname === PUBLIC_PATH || pathname.startsWith(AUTH_PREFIX)
+  const isPublic = pathname === PUBLIC_PATH || pathname === ORG_ERROR_PATH || pathname === ROLES_ERROR_PATH || pathname.startsWith(AUTH_PREFIX)
 
   const authResponse = await auth0.middleware(request)
 
@@ -27,8 +28,10 @@ export async function middleware(request: NextRequest) {
     return authResponse
   }
 
-  // Ruta protegida sin cookie de sesión → redirigir a login antes de tocar el servidor
-  if (!request.cookies.get(SESSION_COOKIE_NAME)) {
+  // Ruta protegida: validar sesión real (más robusto que revisar nombre de cookie).
+  // Esto evita loops por cookies chunked/inconsistentes y sigue previniendo flicker.
+  const session = await auth0.getSession(request)
+  if (!session) {
     return NextResponse.redirect(new URL(PUBLIC_PATH, request.url))
   }
 

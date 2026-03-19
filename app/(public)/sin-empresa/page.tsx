@@ -6,7 +6,19 @@ import { Button } from "@/components/ui/button"
  * Página mostrada cuando el usuario está autenticado pero no tiene ninguna
  * empresa (Organization en Auth0) asignada. Redirigido desde el layout protegido.
  */
-export default function SinEmpresaPage() {
+export default function SinEmpresaPage({
+  searchParams,
+}: {
+  searchParams?: { reason?: string }
+}) {
+  const reason = searchParams?.reason ?? ""
+  const message =
+    reason === "auth0_orgs_failed"
+      ? "No se pudieron cargar tus Organizations desde Auth0. Revisa permisos / audience / scopes del Management API."
+      : reason === "no_orgs_assigned"
+        ? "No tienes empresa asignada. Contacta al administrador para que te asigne a una organización."
+        : "No tienes empresa asignada. Contacta al administrador para que te asigne a una organización."
+
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-background px-4">
       <div className="w-full max-w-sm space-y-8">
@@ -20,9 +32,7 @@ export default function SinEmpresaPage() {
               <p className="text-xs text-muted-foreground mt-1">Sistema de Gestión</p>
             </div>
           </Link>
-          <p className="text-sm text-muted-foreground mt-6">
-            No tienes empresa asignada. Contacta al administrador para que te asigne a una organización.
-          </p>
+          <p className="text-sm text-muted-foreground mt-6">{message}</p>
         </div>
 
         <div className="space-y-3">
