@@ -7,7 +7,7 @@ import { Auth0Client } from "@auth0/nextjs-auth0/server"
  * define AUTH0_ORGANIZATIONS_ENABLED=true y AUTH0_DEFAULT_ORGANIZATION_ID=org_xxx (ID de una org, p. ej. Pintacomex).
  */
 const COLORCENTER_API_AUDIENCE =
-  process.env.AUTH0_AUDIENCE ?? process.env.COLORCENTER_API_IDENTIFIER ?? "https://app-color-center-api.com"
+  process.env.AUTH0_AUDIENCE ?? process.env.COLORCENTER_API_IDENTIFIER
 
 const authorizationParameters: Record<string, string> = {}
 
@@ -17,7 +17,11 @@ if (process.env.AUTH0_ORGANIZATIONS_ENABLED === "true" && process.env.AUTH0_DEFA
 }
 
 // Request RBAC/authorization for our API, so Post Login can read event.authorization.roles.
-authorizationParameters.audience = COLORCENTER_API_AUDIENCE
+// IMPORTANT: `audience` must be the Auth0 API "Identifier" (and must match what your Auth0 Action expects).
+// If it's missing or wrong, Auth0 can fail the token validation and the login flow may loop.
+if (COLORCENTER_API_AUDIENCE?.trim()) {
+  authorizationParameters.audience = COLORCENTER_API_AUDIENCE.trim()
+}
 
 const auth0Options = Object.keys(authorizationParameters).length > 0 ? { authorizationParameters } : undefined
 
