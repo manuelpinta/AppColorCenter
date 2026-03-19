@@ -1,27 +1,20 @@
 import Link from "next/link"
 import { Building2, LogOut } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { auth0 } from "@/lib/auth0"
-import { getUserRoles } from "@/lib/auth-roles"
-
-const ROLES_CLAIM = "https://colorcenter.app/roles"
 
 export default async function SinRolPage({
   searchParams,
 }: {
-  searchParams?: { reason?: string; redirectTo?: string }
+  searchParams?: { reason?: string; debug?: string }
 }) {
   const reason = searchParams?.reason ?? "unknown"
-  const session = await auth0.getSession()
-  const roles = await getUserRoles()
-  const hasRolesClaim = session?.user?.[ROLES_CLAIM] !== undefined
 
   const title =
     reason === "roles_claim_missing" ? "Modo lectura por falta de roles" : "Error de permisos (roles)"
 
   const description =
     reason === "roles_claim_missing"
-      ? "No se pudieron cargar los roles desde Auth0. Por seguridad, dejamos la app en modo lectura y registramos logs para debug."
+      ? "No se pudieron cargar los roles desde Auth0. Por seguridad, dejamos la app en modo lectura."
       : "No tienes permisos para realizar esta acción. (Esto se decide con los roles de Auth0)."
 
   return (
@@ -42,25 +35,11 @@ export default async function SinRolPage({
           <p className="text-sm text-muted-foreground">{description}</p>
         </div>
 
-        <div className="rounded-lg border bg-card p-4 text-sm space-y-2">
-          <div className="text-muted-foreground">Debug (solo info)</div>
-          <div>
-            <span className="text-muted-foreground">Email:</span>{" "}
-            <span className="font-mono">{session?.user?.email ?? "unknown"}</span>
+        {searchParams?.debug === "true" && (
+          <div className="rounded-lg border bg-card p-4 text-sm text-muted-foreground">
+            Debug habilitado. reason: <span className="font-mono">{reason}</span>
           </div>
-          <div>
-            <span className="text-muted-foreground">roles claim presente:</span>{" "}
-            <span className="font-mono">{String(hasRolesClaim)}</span>
-          </div>
-          <div>
-            <span className="text-muted-foreground">roles:</span>{" "}
-            <span className="font-mono">{roles.length ? JSON.stringify(roles) : "[]"}</span>
-          </div>
-          <div>
-            <span className="text-muted-foreground">reason:</span>{" "}
-            <span className="font-mono">{reason}</span>
-          </div>
-        </div>
+        )}
 
         <div className="space-y-3">
           <Button asChild variant="outline" className="w-full" size="lg">

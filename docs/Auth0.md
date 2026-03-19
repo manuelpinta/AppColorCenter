@@ -48,6 +48,16 @@ AUTH0_SECRET=tu_secret_de_64_chars
 
 La librería `@auth0/nextjs-auth0` usa estos valores en `lib/auth0.ts` y en el `middleware.ts`.
 
+Adicionalmente, para que el login evalúe RBAC/roles para el recurso correcto (API Identifier):
+
+```env
+# API Identifier del recurso que evalúa RBAC (Auth0 → APIs → Identifier).
+# En esta app se usa `AUTH0_AUDIENCE` o `COLORCENTER_API_IDENTIFIER`.
+AUTH0_AUDIENCE=https://app-color-center-api.com
+# (Opcional, por compatibilidad con este repo)
+COLORCENTER_API_IDENTIFIER=https://app-color-center-api.com
+```
+
 ---
 
 ## 3. Roles y varias apps (visión rápida)
@@ -60,6 +70,26 @@ En esta app, los roles viven en Auth0; las tablas de MySQL no gestionan permisos
 
 ---
 
+## 3.1. Claim de roles en la sesión (`https://colorcenter.app/roles`)
+
+La app espera el claim:
+
+- Claim: `https://colorcenter.app/roles`
+- Formato esperado: arreglo de strings, por ejemplo `["soporte","gerente-regional"]`
+
+Este claim lo monta una **Action** con Trigger **Post Login** que copia `event.authorization.roles`
+en:
+- `api.idToken.setCustomClaim(namespace, roles)`
+- `api.accessToken.setCustomClaim(namespace, roles)`
+
+Detalles de implementación en esta app:
+
+1. El login debe pedir un token con `audience` igual al **API Identifier** del recurso RBAC.
+   - En esta app se define en `lib/auth0.ts` usando `AUTH0_AUDIENCE` o `COLORCENTER_API_IDENTIFIER`.
+2. `@auth0/nextjs-auth0` filtra claims por defecto al guardar la sesión.
+   - En esta app se configuró `beforeSessionSaved` para conservar el claim dentro de `session.user`.
+
+---
 ## 4. Organizations por empresa
 
 La app ya está preparada para filtrar datos por **Organizations** de Auth0. Cada Organization ≈ una **empresa** (`emp-1`…`emp-5` en código).
@@ -75,6 +105,8 @@ En `.env`:
 | `AUTH0_M2M_CLIENT_ID` | Client ID de la aplicación **Machine-to-Machine** que el backend usa para el Management API. Si no la usas, puede usarse el mismo `AUTH0_CLIENT_ID` de la app de login. |
 | `AUTH0_M2M_CLIENT_SECRET` | Client Secret de esa M2M (o el de la app de login si usas la misma). |
 | `AUTH0_MANAGEMENT_AUDIENCE` | *(Opcional)* Por defecto `https://{AUTH0_DOMAIN}/api/v2/`. Solo definir si tu tenant usa otro audience. |
+| `AUTH0_MANAGEMENT_SCOPES` | *(Opcional pero recomendado)* Scopes que se piden al token `client_credentials` de la Management API. |
+| `AUTH0_MANAGEMENT_FETCH_TIMEOUT_MS` | *(Opcional)* Timeout (ms) para llamadas a Management API. Evita “cargando infinito” si la Management API falla o tarda. |
 
 Ejemplo mínimo:
 
@@ -126,6 +158,17 @@ Para saber a qué empresas puede acceder un usuario, el backend llama al **Auth0
 Si `AUTH0_ORGANIZATIONS_ENABLED` es `false`, la app usa todas las empresas configuradas (`EMPRESA_IDS`) como antes.
 
 ---
+## 5.1. (Opcional) Management API para roles
+
+En esta app existe un respaldo opcional para roles si el claim `https://colorcenter.app/roles` no está disponible.
+
+Endpoint:
+
+- `GET /api/v2/users/{user_id}/roles`
+
+Si habilitas esta opción, tu M2M debe tener scopes suficientes para ese endpoint. En este repo se controla con `AUTH0_ROLES_FALLBACK_MANAGEMENT_API=true`.
+
+---
 
 ## 6. Comportamiento en la app
 
@@ -144,6 +187,14 @@ Resultado:
 - Usuario en **2 orgs (Pinta + Gallco)** → ve datos combinados de ambas empresas (respetando futuras vistas/selector de empresa que quieras añadir).
 
 ---
+## 6.1. Evitar “flicker” mientras no hay sesión
+
+Para que la app no empiece a renderizar consultas antes de que exista sesión:
+
+- `middleware.ts` deja pasar rutas públicas (`/login` y `/auth/*`).
+- En rutas protegidas, si no existe la cookie de sesión `__session`, redirige a `/login` antes de renderizar.
+
+---
 
 ## 7. Resumen rápido
 
@@ -158,3 +209,20 @@ Resultado:
    - Usa `@auth0/nextjs-auth0` para sesión.
    - Llama al Management API para saber tus orgs.
    - Filtra todas las lecturas/escrituras de datos a solo esas empresas.
+
+---
+## 8. Checklist para replicar en otra app
+
+1. En Auth0 crea/selecciona la **Application** del login como `Regular Web Application`.
+2. Configura `Allowed Callback URLs`, `Allowed Logout URLs` y `Allowed Web Origins`.
+3. Crea **Roles** con nombres exactos (ej. `soporte`, `gerente-regional`, `soporte-central`).
+4. Crea una **Action (Post Login)** para setear el claim `https://colorcenter.app/roles`.
+5. Asegura que el login en la app usa `audience` = **API Identifier** del recurso RBAC (`AUTH0_AUDIENCE` o `COLORCENTER_API_IDENTIFIER`).
+6. Crea **Organizations** por empresa, asigna el usuario como member y activa la app en cada Organization.
+7. Configura la **M2M** para Management API (`AUTH0_M2M_CLIENT_ID` / `AUTH0_M2M_CLIENT_SECRET`) y scopes necesarios.
+8. En `.env` activa `AUTH0_ORGANIZATIONS_ENABLED=true` y, si usas “Only organization”, define `AUTH0_DEFAULT_ORGANIZATION_ID`.
+9. (Opcional) Si quieres respaldo por roles, activa `AUTH0_ROLES_FALLBACK_MANAGEMENT_API=true` y define `AUTH0_MANAGEMENT_SCOPES`.
+10. En el backend:
+   - Mapea Organizations → `EmpresaId`.
+   - Usa `getEmpresaIdsForDataLayer()` en listados “all bases”.
+   - Usa `isEmpresaAllowedForRequest()` antes de abrir pools MySQL.

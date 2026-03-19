@@ -9,6 +9,12 @@ interface Auth0Organization {
   name: string
 }
 
+/** Respuesta de GET /api/v2/users/{user_id}/roles (solo usamos name). */
+interface Auth0Role {
+  id: string
+  name: string
+}
+
 /**
  * Mapeo nombre de Organization en Auth0 → EmpresaId.
  * Case-insensitive; "Pintacomex" y "Pinta" → emp-1.
@@ -39,6 +45,7 @@ async function getManagementApiToken(): Promise<string> {
   const clientId = process.env.AUTH0_M2M_CLIENT_ID ?? process.env.AUTH0_CLIENT_ID
   const clientSecret = process.env.AUTH0_M2M_CLIENT_SECRET ?? process.env.AUTH0_CLIENT_SECRET
   const audience = process.env.AUTH0_MANAGEMENT_AUDIENCE ?? `https://${domain}/api/v2/`
+  const scopes = process.env.AUTH0_MANAGEMENT_SCOPES?.trim()
 
   if (!domain || !clientId || !clientSecret) {
     throw new Error(
@@ -46,25 +53,39 @@ async function getManagementApiToken(): Promise<string> {
     )
   }
 
-  const res = await fetch(`https://${domain}/oauth/token`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      grant_type: "client_credentials",
-      client_id: clientId,
-      client_secret: clientSecret,
-      audience,
-    }),
-  })
+  const controller = new AbortController()
+  const timeoutMs = Number(process.env.AUTH0_MANAGEMENT_FETCH_TIMEOUT_MS) || 8000
+  const timeout = setTimeout(() => controller.abort(), timeoutMs)
 
-  if (!res.ok) {
-    const text = await res.text()
-    throw new Error(`Auth0 Management API token failed: ${res.status} ${text}`)
+  try {
+    const res = await fetch(`https://${domain}/oauth/token`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        grant_type: "client_credentials",
+        client_id: clientId,
+        client_secret: clientSecret,
+        audience,
+        ...(scopes ? { scope: scopes } : {}),
+      }),
+      signal: controller.signal,
+    })
+
+    if (!res.ok) {
+      const text = await res.text()
+      throw new Error(`Auth0 Management API token failed: ${res.status} ${text}`)
+    }
+
+    const data = (await res.json()) as { access_token?: string }
+    if (!data.access_token) throw new Error("Auth0 token response missing access_token")
+    return data.access_token
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.error("[auth0-organizations] Management token fetch failed", err)
+    throw err
+  } finally {
+    clearTimeout(timeout)
   }
-
-  const data = (await res.json()) as { access_token?: string }
-  if (!data.access_token) throw new Error("Auth0 token response missing access_token")
-  return data.access_token
 }
 
 /**
@@ -78,18 +99,66 @@ export async function getUserOrganizations(userId: string): Promise<Auth0Organiz
   if (!domain) return []
 
   const token = await getManagementApiToken()
-  const res = await fetch(`https://${domain}/api/v2/users/${encodeURIComponent(userId)}/organizations`, {
-    headers: { Authorization: `Bearer ${token}` },
-  })
+  const controller = new AbortController()
+  const timeoutMs = Number(process.env.AUTH0_MANAGEMENT_FETCH_TIMEOUT_MS) || 8000
+  const timeout = setTimeout(() => controller.abort(), timeoutMs)
 
-  if (res.status === 404) return []
-  if (!res.ok) {
-    const text = await res.text()
-    throw new Error(`Auth0 getUserOrganizations failed: ${res.status} ${text}`)
+  try {
+    const res = await fetch(`https://${domain}/api/v2/users/${encodeURIComponent(userId)}/organizations`, {
+      headers: { Authorization: `Bearer ${token}` },
+      signal: controller.signal,
+    })
+
+    if (res.status === 404) return []
+    if (!res.ok) {
+      const text = await res.text()
+      throw new Error(`Auth0 getUserOrganizations failed: ${res.status} ${text}`)
+    }
+
+    const list = (await res.json()) as Auth0Organization[]
+    return Array.isArray(list) ? list : []
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.error("[auth0-organizations] getUserOrganizations fetch failed", err)
+    throw err
+  } finally {
+    clearTimeout(timeout)
   }
+}
 
-  const list = (await res.json()) as Auth0Organization[]
-  return Array.isArray(list) ? list : []
+/**
+ * Obtiene roles del usuario desde Auth0 Management API.
+ * Requiere M2M con scope read:roles.
+ */
+export async function getUserRolesFromManagementAPI(userId: string): Promise<string[]> {
+  if (!AUTH0_ORGANIZATIONS_ENABLED) return []
+
+  const domain = process.env.AUTH0_DOMAIN
+  if (!domain) return []
+
+  const token = await getManagementApiToken()
+  const controller = new AbortController()
+  const timeoutMs = Number(process.env.AUTH0_MANAGEMENT_FETCH_TIMEOUT_MS) || 8000
+  const timeout = setTimeout(() => controller.abort(), timeoutMs)
+
+  try {
+    const res = await fetch(`https://${domain}/api/v2/users/${encodeURIComponent(userId)}/roles`, {
+      headers: { Authorization: `Bearer ${token}` },
+      signal: controller.signal,
+    })
+
+    if (!res.ok) {
+      // eslint-disable-next-line no-console
+      console.error("[auth0-organizations] getUserRolesFromManagementAPI failed", res.status)
+      const text = await res.text().catch(() => "")
+      throw new Error(`Auth0 getUserRolesFromManagementAPI failed: ${res.status} ${text}`)
+    }
+
+    const list = (await res.json()) as Auth0Role[]
+    return Array.isArray(list) ? list.map((r) => r.name).filter((n) => typeof n === "string" && n.trim() !== "") : []
+  } finally {
+    clearTimeout(timeout)
+  }
 }
 
 /**

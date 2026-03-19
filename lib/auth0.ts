@@ -1,4 +1,4 @@
-import { Auth0Client } from "@auth0/nextjs-auth0/server"
+import { Auth0Client, filterDefaultIdTokenClaims } from "@auth0/nextjs-auth0/server"
 
 /**
  * Cliente de Auth0 para Next.js (sesión en servidor).
@@ -23,6 +23,21 @@ if (COLORCENTER_API_AUDIENCE?.trim()) {
   authorizationParameters.audience = COLORCENTER_API_AUDIENCE.trim()
 }
 
-const auth0Options = Object.keys(authorizationParameters).length > 0 ? { authorizationParameters } : undefined
+// Keep only our custom roles claim inside `session.user`.
+// The SDK normally filters out non-default ID token claims; we re-add the one we need.
+const ROLES_CLAIM = "https://colorcenter.app/roles"
+const beforeSessionSaved = async (session: any) => {
+  const userClaims = session?.user ?? {}
+  const filtered = filterDefaultIdTokenClaims(userClaims)
+  if (userClaims[ROLES_CLAIM] !== undefined) {
+    filtered[ROLES_CLAIM] = userClaims[ROLES_CLAIM]
+  }
+  return { ...session, user: filtered }
+}
+
+const auth0Options =
+  Object.keys(authorizationParameters).length > 0
+    ? { authorizationParameters, beforeSessionSaved }
+    : { beforeSessionSaved }
 
 export const auth0 = new Auth0Client(auth0Options)

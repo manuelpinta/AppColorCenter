@@ -14,15 +14,29 @@ export default async function ProtectedLayout({
 }: {
   children: React.ReactNode
 }) {
-  const session = await auth0.getSession()
+  let session: Awaited<ReturnType<typeof auth0.getSession>>
+  try {
+    session = await auth0.getSession()
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.error("[protected-layout] auth0.getSession threw", err)
+    redirect("/login")
+  }
+
   if (!session) {
     redirect("/login")
   }
 
   if (isAuth0OrganizationsEnabled()) {
-    const allowed = await getCachedAllowedEmpresaIds()
-    if (!allowed || allowed.length === 0) {
-      redirect("/sin-empresa")
+    try {
+      const allowed = await getCachedAllowedEmpresaIds()
+      if (!allowed || allowed.length === 0) {
+        redirect("/sin-empresa?reason=no_orgs_assigned")
+      }
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error("[protected-layout] Failed to compute allowed orgs", err)
+      redirect("/sin-empresa?reason=auth0_orgs_failed")
     }
   }
 
