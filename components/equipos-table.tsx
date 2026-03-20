@@ -26,6 +26,8 @@ function getEquipoSucursalKey(eq: EquipoWithEmpresa): string {
 }
 
 export function EquiposTable({ equipos, colorCenters, canWrite }: EquiposTableProps) {
+  // Temporal: ocultar datos de arrendamiento en listado de equipos.
+  const showLeasingInfo = false
   const colorCenterMap = new Map(colorCenters.map((cc) => [getColorCenterKey(cc), cc]))
 
   const [filterTipo, setFilterTipo] = useState<Set<string> | null>(null)
@@ -72,6 +74,7 @@ export function EquiposTable({ equipos, colorCenters, canWrite }: EquiposTablePr
       else if (sortBy === "sucursal") cmp = (ccA?.nombre_sucursal ?? "").localeCompare(ccB?.nombre_sucursal ?? "")
       else if (sortBy === "estado") cmp = (a.estado ?? "").localeCompare(b.estado ?? "")
       else if (sortBy === "vencimiento") {
+        if (!showLeasingInfo) return 0
         const dateA = a.tipo_propiedad === "Arrendado" && a.fecha_vencimiento_arrendamiento ? new Date(a.fecha_vencimiento_arrendamiento).getTime() : 0
         const dateB = b.tipo_propiedad === "Arrendado" && b.fecha_vencimiento_arrendamiento ? new Date(b.fecha_vencimiento_arrendamiento).getTime() : 0
         cmp = dateA - dateB
@@ -144,7 +147,7 @@ export function EquiposTable({ equipos, colorCenters, canWrite }: EquiposTablePr
       <div className="md:hidden space-y-2">
         {sortedEquipos.map((equipo) => {
           const colorCenter = colorCenterMap.get(getEquipoSucursalKey(equipo))
-          const venc = equipo.tipo_propiedad === "Arrendado" && equipo.fecha_vencimiento_arrendamiento
+          const venc = showLeasingInfo && equipo.tipo_propiedad === "Arrendado" && equipo.fecha_vencimiento_arrendamiento
           const vencDate = venc ? new Date(equipo.fecha_vencimiento_arrendamiento!) : null
           const hoy = new Date()
           hoy.setHours(0, 0, 0, 0)
@@ -165,7 +168,7 @@ export function EquiposTable({ equipos, colorCenters, canWrite }: EquiposTablePr
                       {colorCenter?.nombre_sucursal || "—"}
                       {equipo.numero_serie && ` · ${equipo.numero_serie}`}
                     </p>
-                    {venc && dias != null && (dias < 0 || dias <= 30) && (
+                    {showLeasingInfo && venc && dias != null && (dias < 0 || dias <= 30) && (
                       <p className="text-xs mt-1">
                         {dias < 0 ? (
                           <Badge variant="outline" className="text-destructive border-destructive/30 text-xs">Vencido</Badge>
@@ -213,14 +216,16 @@ export function EquiposTable({ equipos, colorCenters, canWrite }: EquiposTablePr
                   <TableColumnFilter label="Estado" options={estadoOptions} selected={filterEstado} onSelectedChange={setFilterEstado} searchPlaceholder="Buscar estado..." />
                 }
               />
-              <TableSortHeader label="Venc. arrend." sortKey="vencimiento" currentSortKey={sortBy} currentOrder={sortOrder} onSort={handleSort} className="py-3 px-4" />
+              {showLeasingInfo && (
+                <TableSortHeader label="Venc. arrend." sortKey="vencimiento" currentSortKey={sortBy} currentOrder={sortOrder} onSort={handleSort} className="py-3 px-4" />
+              )}
               <th className="text-right py-3 px-4 font-medium text-muted-foreground w-20">Acciones</th>
             </tr>
           </thead>
           <tbody>
             {sortedEquipos.map((equipo) => {
               const colorCenter = colorCenterMap.get(getEquipoSucursalKey(equipo))
-              const venc = equipo.tipo_propiedad === "Arrendado" && equipo.fecha_vencimiento_arrendamiento
+              const venc = showLeasingInfo && equipo.tipo_propiedad === "Arrendado" && equipo.fecha_vencimiento_arrendamiento
               const vencDate = venc ? new Date(equipo.fecha_vencimiento_arrendamiento!) : null
               const hoy = new Date()
               hoy.setHours(0, 0, 0, 0)
@@ -234,21 +239,23 @@ export function EquiposTable({ equipos, colorCenters, canWrite }: EquiposTablePr
                   <td className="py-3 px-4 text-muted-foreground">{equipo.numero_serie || "-"}</td>
                   <td className="py-3 px-4 text-muted-foreground">{colorCenter?.nombre_sucursal || "-"}</td>
                   <td className="py-3 px-4">{getEstadoBadge(equipo.estado)}</td>
-                  <td className="py-3 px-4">
-                    {venc ? (
-                      <span className="flex items-center gap-1.5">
-                        {vencDate!.toLocaleDateString("es-ES", { day: "2-digit", month: "short", year: "numeric" })}
-                        {dias != null && dias < 0 && (
-                          <Badge variant="outline" className="text-destructive border-destructive/30 text-xs">Vencido</Badge>
-                        )}
-                        {dias != null && dias >= 0 && dias <= 30 && (
-                          <Badge variant="outline" className="text-amber-600 border-amber-300 text-xs">{dias}d</Badge>
-                        )}
-                      </span>
-                    ) : (
-                      <span className="text-muted-foreground">—</span>
-                    )}
-                  </td>
+                  {showLeasingInfo && (
+                    <td className="py-3 px-4">
+                      {venc ? (
+                        <span className="flex items-center gap-1.5">
+                          {vencDate!.toLocaleDateString("es-ES", { day: "2-digit", month: "short", year: "numeric" })}
+                          {dias != null && dias < 0 && (
+                            <Badge variant="outline" className="text-destructive border-destructive/30 text-xs">Vencido</Badge>
+                          )}
+                          {dias != null && dias >= 0 && dias <= 30 && (
+                            <Badge variant="outline" className="text-amber-600 border-amber-300 text-xs">{dias}d</Badge>
+                          )}
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </td>
+                  )}
                   <td className="py-3 px-4 text-right">
                     <Link href={`/equipos/${equipo.id}`}>
                       <Button variant="ghost" size="sm">

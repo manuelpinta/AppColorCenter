@@ -82,6 +82,9 @@ export function EquipoForm({
   equipoIdForLink,
 }: EquipoFormProps) {
   const router = useRouter()
+  // Temporal: ocultar arrendamiento y calibracion/revision en formulario.
+  const showLeasingFields = false
+  const showCalibrationFields = false
   const errorRef = useRef<HTMLDivElement>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -571,52 +574,54 @@ export function EquipoForm({
                   onChange={(e) => setFormData({ ...formData, fecha_compra: e.target.value })}
                 />
               </div>
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="tipo_propiedad">Propiedad del equipo</Label>
-                  <Select
-                    value={formData.tipo_propiedad}
-                    onValueChange={(value: "Propio" | "Arrendado") =>
-                      setFormData({ ...formData, tipo_propiedad: value, arrendador_id: value === "Propio" ? "" : formData.arrendador_id })
-                    }
-                  >
-                    <SelectTrigger id="tipo_propiedad">
-                      <SelectValue placeholder="¿Propio o arrendado?" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Propio">Propiedad nuestra</SelectItem>
-                      <SelectItem value="Arrendado">En arrendamiento</SelectItem>
-                    </SelectContent>
-                  </Select>
+              {showLeasingFields && (
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="tipo_propiedad">Propiedad del equipo</Label>
+                    <Select
+                      value={formData.tipo_propiedad}
+                      onValueChange={(value: "Propio" | "Arrendado") =>
+                        setFormData({ ...formData, tipo_propiedad: value, arrendador_id: value === "Propio" ? "" : formData.arrendador_id })
+                      }
+                    >
+                      <SelectTrigger id="tipo_propiedad">
+                        <SelectValue placeholder="¿Propio o arrendado?" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Propio">Propiedad nuestra</SelectItem>
+                        <SelectItem value="Arrendado">En arrendamiento</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {formData.tipo_propiedad === "Arrendado" && (
+                    <>
+                      <div className="space-y-2">
+                        <Label>¿De quién estamos arrendando?</Label>
+                        <CreatableCombobox
+                          value={formData.arrendador_id}
+                          onValueChange={(v) => setFormData({ ...formData, arrendador_id: v })}
+                          options={arrendadorOptions}
+                          placeholder={!empresaId ? "Primero selecciona empresa" : catalogLoading ? "Cargando..." : "Selecciona arrendadora..."}
+                          disabled={!empresaId || catalogLoading}
+                          searchPlaceholder="Buscar arrendadora..."
+                          emptyText="No hay arrendadoras con ese nombre."
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="fecha_vencimiento_arrendamiento">Vencimiento del contrato</Label>
+                        <Input
+                          id="fecha_vencimiento_arrendamiento"
+                          type="date"
+                          value={formData.fecha_vencimiento_arrendamiento}
+                          onChange={(e) =>
+                            setFormData({ ...formData, fecha_vencimiento_arrendamiento: e.target.value })
+                          }
+                        />
+                      </div>
+                    </>
+                  )}
                 </div>
-                {formData.tipo_propiedad === "Arrendado" && (
-                  <>
-                    <div className="space-y-2">
-                      <Label>¿De quién estamos arrendando?</Label>
-                      <CreatableCombobox
-                        value={formData.arrendador_id}
-                        onValueChange={(v) => setFormData({ ...formData, arrendador_id: v })}
-                        options={arrendadorOptions}
-                        placeholder={!empresaId ? "Primero selecciona empresa" : catalogLoading ? "Cargando..." : "Selecciona arrendadora..."}
-                        disabled={!empresaId || catalogLoading}
-                        searchPlaceholder="Buscar arrendadora..."
-                        emptyText="No hay arrendadoras con ese nombre."
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="fecha_vencimiento_arrendamiento">Vencimiento del contrato</Label>
-                      <Input
-                        id="fecha_vencimiento_arrendamiento"
-                        type="date"
-                        value={formData.fecha_vencimiento_arrendamiento}
-                        onChange={(e) =>
-                          setFormData({ ...formData, fecha_vencimiento_arrendamiento: e.target.value })
-                        }
-                      />
-                    </div>
-                  </>
-                )}
-              </div>
+              )}
             </>
           )}
 
@@ -764,7 +769,7 @@ export function EquipoForm({
           )}
 
           {/* Calibración y Revisión: no aplican a Equipo de Computo */}
-          {formData.tipo_equipo !== "Equipo de Computo" && (
+          {showCalibrationFields && formData.tipo_equipo !== "Equipo de Computo" && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="ultima_calibracion">Última Calibración</Label>

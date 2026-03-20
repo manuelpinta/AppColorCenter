@@ -1,6 +1,7 @@
 import { requireWrite } from "@/lib/auth-roles"
 import { EquipoForm } from "@/components/equipo-form"
-import { getColorCentersAllBases, getEmpresas } from "@/lib/data"
+import { getColorCentersAllBases } from "@/lib/data"
+import { getEmpresasForCurrentUser } from "@/lib/data/empresas-auth"
 
 export default async function NuevoEquipoPage({
   searchParams,
@@ -10,7 +11,7 @@ export default async function NuevoEquipoPage({
   await requireWrite("/equipos")
   const params = await searchParams
   const [empresas, colorCenters] = await Promise.all([
-    getEmpresas(),
+    getEmpresasForCurrentUser(),
     getColorCentersAllBases(),
   ])
   return (
