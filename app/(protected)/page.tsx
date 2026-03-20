@@ -5,12 +5,11 @@ import {
   getColorCentersAllBases,
   getEquiposAllBases,
   getEquiposByEmpresa,
-  getEmpresas,
-  getEmpresaById,
   getRegionesFromColorCenters,
   getSucursalesByEmpresa,
 } from "@/lib/data"
 import type { EmpresaId } from "@/lib/empresas-config"
+import { getEmpresasForCurrentUser } from "@/lib/data/empresas-auth"
 
 /** Siempre dinámico para que searchParams (?e=, ?empresa=) se usen y solo se consulte esa base. */
 export const dynamic = "force-dynamic"
@@ -21,18 +20,22 @@ export default async function DashboardPage({
   searchParams: Promise<{ empresa?: string; e?: string }>
 }) {
   const params = await searchParams
+  const [empresas, colorCentersAll, equiposAll] = await Promise.all([
+    getEmpresasForCurrentUser(),
+    getColorCentersAllBases(),
+    getEquiposAllBases(),
+  ])
+  const allowedEmpresaIds = new Set(empresas.map((e) => e.id))
   const rawEmpresa = params.empresa ?? params.e
   const singleEmpresaId: EmpresaId | null =
-    rawEmpresa && getEmpresaById(rawEmpresa) ? (rawEmpresa as EmpresaId) : null
-
-  const empresas = getEmpresas()
+    rawEmpresa && allowedEmpresaIds.has(rawEmpresa) ? (rawEmpresa as EmpresaId) : null
 
   const [colorCenters, equipos] = singleEmpresaId
     ? await Promise.all([
         getSucursalesByEmpresa(singleEmpresaId),
         getEquiposByEmpresa(singleEmpresaId),
       ])
-    : await Promise.all([getColorCentersAllBases(), getEquiposAllBases()])
+    : [colorCentersAll, equiposAll]
 
   const regiones = getRegionesFromColorCenters(colorCenters)
   return (

@@ -35,6 +35,10 @@ export function ColorCenterDetail({
   sucursalIdForLinks,
   canWrite,
 }: ColorCenterDetailProps) {
+  // Temporal: ocultar arrendamiento en detalle de sucursal.
+  // Cuando se defina el rol correspondiente, cambiar a `true`.
+  const showLeasingInfo = false
+
   const getEstadoBadgeColor = (estado: string) => {
     switch (estado) {
       case "Operativo":
@@ -185,7 +189,12 @@ export function ColorCenterDetail({
           </div>
         </CardHeader>
         <CardContent>
-          <EquiposList equipos={equipos} colorCenterId={sucursalIdForLinks} canWrite={canWrite} />
+          <EquiposList
+            equipos={equipos}
+            colorCenterId={sucursalIdForLinks}
+            canWrite={canWrite}
+            showLeasingInfo={showLeasingInfo}
+          />
         </CardContent>
       </Card>
 

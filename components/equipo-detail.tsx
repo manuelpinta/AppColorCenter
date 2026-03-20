@@ -29,6 +29,9 @@ interface EquipoDetailProps {
 }
 
 export function EquipoDetail({ equipo, colorCenter, mantenimientos }: EquipoDetailProps) {
+  // Temporal: ocultar datos de arrendamiento y calibracion/revision en UI.
+  const showLeasingInfo = false
+  const showCalibrationInfo = false
   const getEstadoBadge = (estado: string) => {
     switch (estado) {
       case "Operativo":
@@ -168,11 +171,13 @@ export function EquipoDetail({ equipo, colorCenter, mantenimientos }: EquipoDeta
               <div className="space-y-1">
                 <p className="text-sm text-muted-foreground">Propiedad</p>
                 <p className="font-medium">
-                  {equipo.tipo_propiedad === "Arrendado" && equipo.arrendador
-                    ? `En arrendamiento - ${equipo.arrendador}`
-                    : "Propiedad nuestra"}
+                  {showLeasingInfo
+                    ? equipo.tipo_propiedad === "Arrendado" && equipo.arrendador
+                      ? `En arrendamiento - ${equipo.arrendador}`
+                      : "Propiedad nuestra"
+                    : equipo.tipo_propiedad}
                 </p>
-                {equipo.tipo_propiedad === "Arrendado" && equipo.fecha_vencimiento_arrendamiento && (
+                {showLeasingInfo && equipo.tipo_propiedad === "Arrendado" && equipo.fecha_vencimiento_arrendamiento && (
                   <p className="text-sm text-muted-foreground mt-1">
                     Vencimiento contrato:{" "}
                     {new Date(equipo.fecha_vencimiento_arrendamiento).toLocaleDateString("es-ES", {
@@ -195,7 +200,7 @@ export function EquipoDetail({ equipo, colorCenter, mantenimientos }: EquipoDeta
                   </p>
                 </div>
               )}
-              {equipo.ultima_calibracion && (
+              {showCalibrationInfo && equipo.ultima_calibracion && (
                 <div className="space-y-1">
                   <p className="text-sm text-muted-foreground">Ultima Calibracion</p>
                   <p className="font-medium">
@@ -207,7 +212,7 @@ export function EquipoDetail({ equipo, colorCenter, mantenimientos }: EquipoDeta
                   </p>
                 </div>
               )}
-              {equipo.proxima_revision && (
+              {showCalibrationInfo && equipo.proxima_revision && (
                 <div className="space-y-1">
                   <p className="text-sm text-muted-foreground">Proxima Revision</p>
                   <div className="flex items-center gap-2">

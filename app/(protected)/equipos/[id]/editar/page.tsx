@@ -4,12 +4,12 @@ import { requireWrite } from "@/lib/auth-roles"
 import { EquipoForm } from "@/components/equipo-form"
 import {
   findEquipoInAllBases,
-  getEmpresas,
   getSucursalesByEmpresa,
   getComputadoraByEquipoId,
   parseEquipoId,
 } from "@/lib/data"
 import { ArrowLeft } from "lucide-react"
+import { getEmpresasForCurrentUser } from "@/lib/data/empresas-auth"
 
 export default async function EditarEquipoPage({ params }: { params: Promise<{ id: string }> }) {
   await requireWrite("/equipos")
@@ -21,7 +21,7 @@ export default async function EditarEquipoPage({ params }: { params: Promise<{ i
 
   const { numericId } = parseEquipoId(id)
   const [empresas, colorCenters, computadoraInicial] = await Promise.all([
-    getEmpresas(),
+    getEmpresasForCurrentUser(),
     getSucursalesByEmpresa(empresaId),
     equipo.tipo_equipo === "Equipo de Computo"
       ? getComputadoraByEquipoId(pool, numericId)

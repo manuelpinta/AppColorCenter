@@ -38,6 +38,9 @@ import {
 export default async function EquipoDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const canWrite = await userCanWrite()
+  // Temporal: ocultar datos de arrendamiento y calibracion/revision en UI.
+  const showLeasingInfo = false
+  const showCalibrationInfo = false
 
   const found = await findEquipoInAllBases(id)
   if (!found) {
@@ -223,11 +226,13 @@ export default async function EquipoDetailPage({ params }: { params: Promise<{ i
                   <div>
                     <p className="text-sm text-muted-foreground">Propiedad</p>
                     <p className="font-medium">
-                      {equipo.tipo_propiedad === "Arrendado" && equipo.arrendador
-                        ? `En arrendamiento - ${equipo.arrendador}`
-                        : "Propiedad nuestra"}
+                      {showLeasingInfo
+                        ? equipo.tipo_propiedad === "Arrendado" && equipo.arrendador
+                          ? `En arrendamiento - ${equipo.arrendador}`
+                          : "Propiedad nuestra"
+                        : equipo.tipo_propiedad}
                     </p>
-                    {equipo.tipo_propiedad === "Arrendado" && equipo.fecha_vencimiento_arrendamiento && (
+                    {showLeasingInfo && equipo.tipo_propiedad === "Arrendado" && equipo.fecha_vencimiento_arrendamiento && (
                       <div className="mt-2 flex flex-wrap items-center gap-2">
                         <span className="text-sm text-muted-foreground">
                           Vencimiento contrato:{" "}
@@ -262,7 +267,8 @@ export default async function EquipoDetailPage({ params }: { params: Promise<{ i
               </CardContent>
             </Card>
 
-            <Card className="border-0 shadow-sm">
+            {showCalibrationInfo && (
+              <Card className="border-0 shadow-sm">
               <CardHeader>
                 <CardTitle className="text-lg">Calibración y Revisión</CardTitle>
               </CardHeader>
@@ -301,6 +307,7 @@ export default async function EquipoDetailPage({ params }: { params: Promise<{ i
                 )}
               </CardContent>
             </Card>
+            )}
 
             {/* Especificaciones de computadora (solo cuando tipo = Equipo de Computo) */}
             {equipo.tipo_equipo === "Equipo de Computo" && (

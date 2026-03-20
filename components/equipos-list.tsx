@@ -8,9 +8,11 @@ interface EquiposListProps {
   equipos: Equipo[]
   colorCenterId: string
   canWrite: boolean
+  /** Oculta datos de arrendamiento en UI sin tocar backend/lógica. */
+  showLeasingInfo?: boolean
 }
 
-export function EquiposList({ equipos, colorCenterId, canWrite }: EquiposListProps) {
+export function EquiposList({ equipos, colorCenterId, canWrite, showLeasingInfo = true }: EquiposListProps) {
   const getEstadoBadge = (estado: string) => {
     switch (estado) {
       case "Operativo":
@@ -95,11 +97,13 @@ export function EquiposList({ equipos, colorCenterId, canWrite }: EquiposListPro
                 <div>
                   <span className="text-muted-foreground">Propiedad:</span>
                   <span className="ml-2 font-medium text-foreground">
-                    {equipo.tipo_propiedad === "Arrendado" && equipo.arrendador
-                      ? `Arrendado - ${equipo.arrendador}`
-                      : "Propio"}
+                    {showLeasingInfo
+                      ? equipo.tipo_propiedad === "Arrendado" && equipo.arrendador
+                        ? `Arrendado - ${equipo.arrendador}`
+                        : "Propio"
+                      : equipo.tipo_propiedad}
                   </span>
-                  {equipo.tipo_propiedad === "Arrendado" && equipo.fecha_vencimiento_arrendamiento && (
+                  {showLeasingInfo && equipo.tipo_propiedad === "Arrendado" && equipo.fecha_vencimiento_arrendamiento && (
                     <span className="ml-2 text-sm text-muted-foreground">
                       (Vence: {new Date(equipo.fecha_vencimiento_arrendamiento).toLocaleDateString("es-ES")})
                     </span>
