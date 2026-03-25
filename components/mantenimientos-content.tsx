@@ -5,8 +5,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Search } from "lucide-react"
 import { MantenimientosTable } from "@/components/mantenimientos-table"
-import type { Mantenimiento, ColorCenter } from "@/lib/types"
+import type { ColorCenter } from "@/lib/types"
 import type { MantenimientoWithEmpresa, EquipoWithEmpresa } from "@/lib/types"
+import { findEquipoForMantenimientoRow } from "@/lib/data/ids"
 
 interface MantenimientosContentProps {
   mantenimientos: MantenimientoWithEmpresa[]
@@ -16,7 +17,7 @@ interface MantenimientosContentProps {
 }
 
 function findEquipo(mant: MantenimientoWithEmpresa, equipos: EquipoWithEmpresa[]): EquipoWithEmpresa | undefined {
-  return equipos.find((e) => e.empresa_id === mant.empresa_id && e.id === `${mant.empresa_id}-${mant.equipo_id}`)
+  return findEquipoForMantenimientoRow(mant, equipos)
 }
 
 function findCC(equipo: EquipoWithEmpresa, colorCenters: ColorCenter[]): ColorCenter | undefined {

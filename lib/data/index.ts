@@ -25,6 +25,8 @@ export {
   parseSucursalId,
   buildEquipoCompositeId,
   parseEquipoId,
+  resolveDefaultEquipoIdForForm,
+  findEquipoForMantenimientoRow,
 } from "./ids"
 
 // Sucursales
@@ -37,6 +39,8 @@ export {
   getColorCentersAllBases,
   getSucursalByCompositeId,
 } from "./sucursales"
+
+export { getEquiposAndColorCentersForMantenimientoCrear } from "./mantenimiento-form-data"
 
 // Equipos
 export {
@@ -57,6 +61,13 @@ export {
   crearFotoEquipo,
   eliminarFotoEquipo,
 } from "./fotos"
+
+// Fotos de mantenimiento
+export {
+  getFotosByMantenimientoId,
+  crearFotoMantenimiento,
+  eliminarFotoMantenimiento,
+} from "./mantenimiento-fotos"
 
 // Computadora (especificaciones)
 export { getComputadoraByEquipoId, actualizarComputadora } from "./computadora"
@@ -79,6 +90,8 @@ export {
   getMantenimientosByIncidenciaId,
   getMantenimientosByEquipoId,
   getMantenimientoById,
+  crearMantenimiento,
+  actualizarMantenimiento,
   getMantenimientosAllBases,
   findMantenimientoInAllBases,
 } from "./mantenimientos"
@@ -94,4 +107,5 @@ export {
 export {
   getOrCreateUsuarioByNombre,
   getNombreUsuarioById,
+  getOrCreateUsuarioFromAuth0,
 } from "./usuarios"

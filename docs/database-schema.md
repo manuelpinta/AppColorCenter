@@ -304,7 +304,8 @@ Mantenimientos preventivos o correctivos por equipo.
 | equipo_id             | INT          | NOT NULL, FK(equipos)                    | Equipo                         |
 | incidencia_id         | INT          | NULL, FK(incidencias) ON DELETE SET NULL  | Incidencia origen (opcional)   |
 | tipo_id               | INT          | NOT NULL, FK(cat_tipos_mantenimiento)    | Preventivo / Correctivo        |
-| tecnico_id            | INT          | NOT NULL, FK(usuarios)                   | Técnico responsable            |
+| realizado_por         | VARCHAR(20)  | Opcional (no en todas las bases)         | `Interno` / `Externo` si existe la columna; si no, la app asume Interno en lectura (`lib/data/mantenimientos.ts`) |
+| tecnico_id            | INT          | NULL, FK(usuarios)                        | Técnico (Auth0 → fila en `usuarios`); NULL si externo o sin técnico |
 | fecha_mantenimiento   | DATE         | NOT NULL                                 | Fecha del servicio             |
 | descripcion           | TEXT         | NOT NULL                                 | Descripción del trabajo        |
 | piezas_cambiadas      | TEXT         | NULL                                     | Piezas reemplazadas            |

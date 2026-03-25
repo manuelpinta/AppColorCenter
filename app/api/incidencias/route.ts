@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { getPool, isEmpresaAllowedForRequest } from "@/lib/db"
 import { crearIncidencia } from "@/lib/data"
 import { parseEquipoId } from "@/lib/data"
+import { invalidateCachedList } from "@/lib/data/cache"
 import type { EstadoIncidencia, SeveridadIncidencia } from "@/lib/types"
 import { userCanWrite } from "@/lib/auth-roles"
 
@@ -87,7 +88,11 @@ export async function POST(request: NextRequest) {
       estado,
       notas: notas?.trim() ?? null,
     })
-    return NextResponse.json({ incidencia })
+    invalidateCachedList("incidenciasAllBases")
+    const idForClient = `${empresaIdToUse}-${incidencia.id}`
+    return NextResponse.json({
+      incidencia: { ...incidencia, id: idForClient, empresa_id: empresaIdToUse },
+    })
   } catch (err) {
     const message = err instanceof Error ? err.message : "Error al crear incidencia"
     return NextResponse.json({ error: message }, { status: 400 })

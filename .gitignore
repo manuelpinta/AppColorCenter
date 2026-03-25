@@ -22,6 +22,9 @@ yarn-error.log*
 # vercel
 .vercel
 
+# Claude / IDE worktrees (copias locales, no parte del proyecto versionado)
+.claude/
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts

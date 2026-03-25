@@ -4,7 +4,10 @@ import {
   findMantenimientoInAllBases,
   getEquipoById,
   getSucursalesByEmpresa,
+  getFotosByMantenimientoId,
+  buildEquipoCompositeId,
 } from "@/lib/data"
+import { MantenimientoFotosSection } from "@/components/mantenimiento-fotos-section"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -30,14 +33,15 @@ export default async function DetalleMantenimientoPage({ params }: { params: Pro
   if (!found) notFound()
   const { mantenimiento, pool, empresaId } = found
 
-  const [equipo, sucursales] = await Promise.all([
+  const [equipo, sucursales, fotos] = await Promise.all([
     getEquipoById(pool, mantenimiento.equipo_id),
     getSucursalesByEmpresa(empresaId),
+    getFotosByMantenimientoId(pool, mantenimiento.id),
   ])
   const colorCenter = equipo
     ? sucursales.find((c) => c.id === equipo.color_center_id)
     : null
-  const equipoIdForLink = equipo ? `${empresaId}-${equipo.id}` : null
+  const equipoIdForLink = equipo ? buildEquipoCompositeId(empresaId, equipo) : null
 
   const getEstadoBadgeColor = (estado: string) => {
     switch (estado) {
@@ -67,7 +71,7 @@ export default async function DetalleMantenimientoPage({ params }: { params: Pro
 
   return (
     <div className="pb-20 lg:pb-0">
-      <div className="px-4 py-6 lg:px-8 lg:py-8 max-w-4xl mx-auto">
+      <div className="px-4 py-6 lg:px-8 lg:py-8 max-w-5xl mx-auto">
         <Link
           href="/mantenimientos"
           className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground mb-6"
@@ -83,7 +87,7 @@ export default async function DetalleMantenimientoPage({ params }: { params: Pro
             </div>
             <div>
               <h1 className="text-2xl font-bold text-foreground">
-                Mantenimiento {mantenimiento.tipo} #{id}
+                Mantenimiento {mantenimiento.tipo} n.º {mantenimiento.id}
               </h1>
               <p className="text-sm text-muted-foreground">
                 {new Date(mantenimiento.fecha_mantenimiento).toLocaleDateString("es-ES", {
@@ -93,6 +97,14 @@ export default async function DetalleMantenimientoPage({ params }: { params: Pro
                   day: "numeric",
                 })}
               </p>
+              {colorCenter && (
+                <p className="text-sm text-foreground/90 mt-1">
+                  {colorCenter.nombre_sucursal}
+                  {colorCenter.codigo_interno ? (
+                    <span className="text-muted-foreground"> · {colorCenter.codigo_interno}</span>
+                  ) : null}
+                </p>
+              )}
             </div>
           </div>
           {canWrite && (
@@ -105,49 +117,48 @@ export default async function DetalleMantenimientoPage({ params }: { params: Pro
           )}
         </div>
 
-        <div className="grid gap-6 lg:grid-cols-3">
-          <div className="lg:col-span-2 space-y-6">
-            <Card className="border-0 shadow-sm">
-              <CardHeader>
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <FileText className="h-5 w-5" />
-                  Descripción
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-foreground whitespace-pre-wrap">{mantenimiento.descripcion}</p>
-                {mantenimiento.piezas_cambiadas && (
-                  <div className="mt-4 pt-4 border-t border-border">
-                    <p className="text-sm text-muted-foreground font-medium flex items-center gap-1.5">
-                      <Package className="h-4 w-4" />
-                      Piezas cambiadas
-                    </p>
-                    <p className="text-sm text-foreground mt-1 whitespace-pre-wrap">
-                      {mantenimiento.piezas_cambiadas}
-                    </p>
-                  </div>
-                )}
-                {mantenimiento.notas && (
-                  <div className="mt-4 pt-4 border-t border-border">
-                    <p className="text-sm text-muted-foreground font-medium">Notas</p>
-                    <p className="text-sm text-foreground mt-1 whitespace-pre-wrap">{mantenimiento.notas}</p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
+        <div className="grid gap-4 lg:grid-cols-5 lg:items-start">
+          <Card className="border border-border/60 shadow-sm lg:col-span-3">
+            <CardHeader className="pb-2 space-y-0">
+              <CardTitle className="text-base flex items-center gap-2">
+                <FileText className="h-4 w-4 shrink-0" />
+                Descripción
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pt-0 space-y-3">
+              <p className="text-foreground text-sm whitespace-pre-wrap leading-relaxed">{mantenimiento.descripcion}</p>
+              {mantenimiento.piezas_cambiadas && (
+                <div className="pt-3 border-t border-border">
+                  <p className="text-xs text-muted-foreground font-medium flex items-center gap-1.5">
+                    <Package className="h-3.5 w-3.5" />
+                    Piezas cambiadas
+                  </p>
+                  <p className="text-sm text-foreground mt-1 whitespace-pre-wrap">{mantenimiento.piezas_cambiadas}</p>
+                </div>
+              )}
+              {mantenimiento.notas && (
+                <div className="pt-3 border-t border-border">
+                  <p className="text-xs text-muted-foreground font-medium">Notas</p>
+                  <p className="text-sm text-foreground mt-1 whitespace-pre-wrap">{mantenimiento.notas}</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
-          <div className="space-y-6">
-            <Card className="border-0 shadow-sm">
-              <CardHeader>
-                <CardTitle className="text-lg">Contexto</CardTitle>
+          <div className="lg:col-span-2 space-y-4">
+            <Card className="border border-border/60 shadow-sm">
+              <CardHeader className="pb-2 flex flex-row items-center justify-between space-y-0">
+                <CardTitle className="text-base">Contexto</CardTitle>
+                <Badge className={`${getEstadoBadgeColor(mantenimiento.estado)} text-xs px-2 py-0.5`}>
+                  {mantenimiento.estado}
+                </Badge>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-start gap-3">
-                  <Wrench className="h-5 w-5 text-primary/60 mt-0.5" />
-                  <div>
-                    <p className="text-sm text-muted-foreground">Realizado por</p>
-                    <p className="font-medium">
+              <CardContent className="space-y-3 pt-0">
+                <div className="flex items-start gap-2.5">
+                  <User className="h-4 w-4 text-primary/60 mt-0.5 shrink-0" />
+                  <div className="min-w-0">
+                    <p className="text-xs text-muted-foreground">Realizado por</p>
+                    <p className="font-medium text-sm">
                       {mantenimiento.realizado_por === "Externo" ? "Externo" : "Interno"}
                       {mantenimiento.realizado_por === "Interno" && mantenimiento.tecnico_responsable && (
                         <span className="text-muted-foreground font-normal"> · {mantenimiento.tecnico_responsable}</span>
@@ -157,13 +168,13 @@ export default async function DetalleMantenimientoPage({ params }: { params: Pro
                 </div>
                 {equipo && equipoIdForLink && (
                   <>
-                    <div className="flex items-start gap-3">
-                      <Wrench className="h-5 w-5 text-primary/60 mt-0.5" />
-                      <div>
-                        <p className="text-sm text-muted-foreground">Equipo</p>
+                    <div className="flex items-start gap-2.5">
+                      <Wrench className="h-4 w-4 text-primary/60 mt-0.5 shrink-0" />
+                      <div className="min-w-0">
+                        <p className="text-xs text-muted-foreground">Equipo</p>
                         <Link
                           href={`/equipos/${equipoIdForLink}`}
-                          className="font-medium text-primary hover:underline"
+                          className="font-medium text-sm text-primary hover:underline"
                         >
                           {equipo.tipo_equipo} {equipo.marca && `- ${equipo.marca}`}
                         </Link>
@@ -173,11 +184,11 @@ export default async function DetalleMantenimientoPage({ params }: { params: Pro
                       </div>
                     </div>
                     {colorCenter && (
-                      <div className="flex items-start gap-3">
-                        <Building2 className="h-5 w-5 text-primary/60 mt-0.5" />
-                        <div>
-                          <p className="text-sm text-muted-foreground">Sucursal</p>
-                          <p className="font-medium">{colorCenter.nombre_sucursal}</p>
+                      <div className="flex items-start gap-2.5">
+                        <Building2 className="h-4 w-4 text-primary/60 mt-0.5 shrink-0" />
+                        <div className="min-w-0">
+                          <p className="text-xs text-muted-foreground">Sucursal</p>
+                          <p className="font-medium text-sm">{colorCenter.nombre_sucursal}</p>
                           <p className="text-xs text-muted-foreground">{colorCenter.codigo_interno}</p>
                         </div>
                       </div>
@@ -185,16 +196,16 @@ export default async function DetalleMantenimientoPage({ params }: { params: Pro
                   </>
                 )}
                 {(mantenimiento.tiempo_fuera_servicio != null || mantenimiento.costo != null) && (
-                  <div className="flex flex-wrap gap-4 pt-2">
+                  <div className="flex flex-wrap gap-3 pt-1 border-t border-border/60">
                     {mantenimiento.tiempo_fuera_servicio != null && (
-                      <div className="flex items-center gap-1.5 text-sm">
-                        <Clock className="h-4 w-4 text-muted-foreground" />
+                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                        <Clock className="h-3.5 w-3.5" />
                         <span>{mantenimiento.tiempo_fuera_servicio}h fuera de servicio</span>
                       </div>
                     )}
                     {mantenimiento.costo != null && (
-                      <div className="flex items-center gap-1.5 text-sm">
-                        <DollarSign className="h-4 w-4 text-muted-foreground" />
+                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                        <DollarSign className="h-3.5 w-3.5" />
                         <span>${mantenimiento.costo.toLocaleString()}</span>
                       </div>
                     )}
@@ -202,15 +213,15 @@ export default async function DetalleMantenimientoPage({ params }: { params: Pro
                 )}
               </CardContent>
             </Card>
-
-            <Card className="border-0 shadow-sm">
-              <CardContent className="pt-6">
-                <Badge className={`${getEstadoBadgeColor(mantenimiento.estado)} text-sm px-3 py-1`}>
-                  {mantenimiento.estado}
-                </Badge>
-              </CardContent>
-            </Card>
           </div>
+        </div>
+
+        <div className="mt-4">
+          <MantenimientoFotosSection
+            mantenimientoId={id}
+            fotos={fotos}
+            canWrite={canWrite}
+          />
         </div>
       </div>
     </div>

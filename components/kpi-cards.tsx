@@ -28,7 +28,7 @@ export function KPICards({ kpis }: KPICardsProps) {
     .join(" · ")
 
   return (
-    <div className="flex overflow-x-auto gap-3 pb-2 -mx-4 px-4 snap-x snap-mandatory lg:mx-0 lg:px-0 lg:grid lg:grid-cols-4 lg:overflow-visible lg:gap-4">
+    <div className="flex overflow-x-auto gap-3 pb-2 snap-x snap-mandatory [-webkit-overflow-scrolling:touch] lg:grid lg:grid-cols-4 lg:overflow-visible lg:gap-4">
       <Card className="border-0 shadow-sm hover:shadow-md transition-shadow shrink-0 w-[152px] snap-start lg:w-auto lg:shrink">
         <CardContent className="p-3 lg:p-5">
           <div className="flex items-start justify-between gap-3">

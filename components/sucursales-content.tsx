@@ -154,7 +154,7 @@ export function SucursalesContent({
           </p>
         </div>
 
-        <div className="flex overflow-x-auto gap-3 pb-2 -mx-4 px-4 snap-x snap-mandatory mb-6 md:mx-0 md:px-0 md:grid md:grid-cols-3 lg:grid-cols-5 md:overflow-visible">
+        <div className="flex overflow-x-auto gap-3 pb-2 snap-x snap-mandatory [-webkit-overflow-scrolling:touch] mb-6 md:grid md:grid-cols-3 lg:grid-cols-5 md:overflow-visible">
           {empresaStats.map((empresa) => (
             <Card
               key={empresa.id}

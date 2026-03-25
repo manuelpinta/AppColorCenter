@@ -2,7 +2,7 @@
  * Helpers de IDs compuestos (sucursal, equipo) sin depender de lib/db.
  * Usado por componentes cliente para evitar meter mysql2 en el bundle.
  */
-import type { ColorCenter, Equipo } from "@/lib/types"
+import type { ColorCenter, Equipo, EquipoWithEmpresa } from "@/lib/types"
 import { EMPRESA_IDS, type EmpresaId } from "@/lib/empresas-config"
 import { getEmpresaById, getEmpresaByCodigo } from "./empresas"
 
@@ -60,4 +60,33 @@ export function parseEquipoId(equipoId: string): { empresaId?: EmpresaId; numeri
     if (EMPRESA_IDS.includes(empresaId) && numericId) return { empresaId, numericId }
   }
   return { numericId: equipoId }
+}
+
+/** Alinea `?equipo_id=` de la URL con el id compuesto usado en listados (p. ej. Select de mantenimientos). */
+export function resolveDefaultEquipoIdForForm(equipos: Equipo[], defaultEquipoId?: string): string {
+  if (!defaultEquipoId?.trim()) return ""
+  const trimmed = defaultEquipoId.trim()
+  if (equipos.some((e) => e.id === trimmed)) return trimmed
+  const parsed = parseEquipoId(trimmed)
+  const match = equipos.find((e) => {
+    const ep = parseEquipoId(e.id)
+    if (parsed.empresaId && ep.empresaId) {
+      return ep.numericId === parsed.numericId && ep.empresaId === parsed.empresaId
+    }
+    return ep.numericId === parsed.numericId
+  })
+  return match?.id ?? trimmed
+}
+
+/** Cruza un mantenimiento (empresa + equipo_id numérico o compuesto) con la lista de equipos (id compuesto CODIGO-sucursal-id). */
+export function findEquipoForMantenimientoRow(
+  mant: { empresa_id: string; equipo_id: string },
+  equipos: EquipoWithEmpresa[]
+): EquipoWithEmpresa | undefined {
+  const mEq = parseEquipoId(String(mant.equipo_id).trim()).numericId
+  if (!mEq) return undefined
+  return equipos.find((e) => {
+    if (e.empresa_id !== mant.empresa_id) return false
+    return parseEquipoId(e.id).numericId === mEq
+  })
 }

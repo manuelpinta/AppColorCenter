@@ -38,7 +38,12 @@ export default async function EditarMantenimientoPage({ params }: { params: Prom
         </div>
       </div>
 
-      <MantenimientoForm equipos={equipos} colorCenters={colorCenters} mantenimiento={mantenimiento} />
+      <MantenimientoForm
+        equipos={equipos}
+        colorCenters={colorCenters}
+        mantenimiento={mantenimiento}
+        mantenimientoId={id}
+      />
     </div>
   )
 }

@@ -10,6 +10,7 @@ import { AlertTriangle, Eye, ChevronRight } from "lucide-react"
 import Link from "next/link"
 import { TableColumnFilter } from "@/components/table-column-filter"
 import { TableSortHeader, type SortOrder } from "@/components/table-sort-header"
+import { findEquipoForMantenimientoRow } from "@/lib/data/ids"
 
 interface IncidenciasTableProps {
   incidencias: IncidenciaWithEmpresa[]
@@ -28,7 +29,7 @@ function findCC(inc: IncidenciaWithEmpresa, colorCenters: ColorCenter[]): ColorC
 
 function findEquipo(inc: IncidenciaWithEmpresa, equipos: EquipoWithEmpresa[]): EquipoWithEmpresa | undefined {
   if (!inc.equipo_id) return undefined
-  return equipos.find((e) => e.empresa_id === inc.empresa_id && e.id === `${inc.empresa_id}-${inc.equipo_id}`)
+  return findEquipoForMantenimientoRow(inc, equipos)
 }
 
 export function IncidenciasTable({ incidencias, colorCenters, equipos, canWrite }: IncidenciasTableProps) {
