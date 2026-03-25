@@ -76,6 +76,16 @@ export interface FotoEquipo {
   created_at: string
 }
 
+/** Foto de mantenimiento; varias por mantenimiento, cada una con fecha. */
+export interface FotoMantenimiento {
+  id: string
+  mantenimiento_id: string
+  url: string
+  fecha_foto: string
+  descripcion: string | null
+  created_at: string
+}
+
 export interface Mantenimiento {
   id: string
   equipo_id: string

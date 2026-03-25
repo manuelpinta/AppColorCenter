@@ -14,12 +14,13 @@ import { ChevronLeft, Save, CheckCircle, Loader2 } from "lucide-react"
 import Link from "next/link"
 import { useMemo } from "react"
 import type { Mantenimiento, Equipo, ColorCenter } from "@/lib/types"
-import { buildSucursalCompositeIdFromIds } from "@/lib/data/ids"
+import { buildSucursalCompositeIdFromIds, resolveDefaultEquipoIdForForm } from "@/lib/data/ids"
 
 interface MantenimientoFormProps {
   equipos: Equipo[]
   colorCenters: ColorCenter[]
   mantenimiento?: Mantenimiento
+  mantenimientoId?: string
   defaultEquipoId?: string
   defaultColorCenterId?: string
 }
@@ -28,6 +29,7 @@ export function MantenimientoForm({
   equipos,
   colorCenters,
   mantenimiento,
+  mantenimientoId,
   defaultEquipoId,
   defaultColorCenterId,
 }: MantenimientoFormProps) {
@@ -48,8 +50,13 @@ export function MantenimientoForm({
   const desdeEquipo = !!defaultEquipoId && !mantenimiento
   const desdeSucursal = !!defaultColorCenterId && !defaultEquipoId
 
+  const resolvedEquipoIdInicial = useMemo(() => {
+    if (mantenimiento?.equipo_id) return mantenimiento.equipo_id
+    return resolveDefaultEquipoIdForForm(equipos, defaultEquipoId)
+  }, [mantenimiento?.equipo_id, equipos, defaultEquipoId])
+
   const [formData, setFormData] = useState({
-    equipo_id: mantenimiento?.equipo_id || defaultEquipoId || "",
+    equipo_id: resolvedEquipoIdInicial,
     tipo: mantenimiento?.tipo || "Preventivo",
     realizado_por: (mantenimiento?.realizado_por ?? "Interno") as "Interno" | "Externo",
     fecha_mantenimiento: mantenimiento?.fecha_mantenimiento || new Date().toISOString().split("T")[0],
@@ -80,24 +87,37 @@ export function MantenimientoForm({
         return
       }
 
-      // Simulate API delay
-      await new Promise((resolve) => setTimeout(resolve, 1000))
-
-      // Show success message
-      alert(
-        mantenimiento
-          ? "Mantenimiento actualizado exitosamente (modo demo)"
-          : "Mantenimiento registrado exitosamente (modo demo)",
-      )
-
-      // Redirigir según contexto: equipo → detalle equipo; sucursal → detalle sucursal; sino → lista mantenimientos
-      if (defaultEquipoId) {
-        router.push(`/equipos/${formData.equipo_id}`)
-      } else if (defaultColorCenterId) {
-        router.push(`/sucursales/${defaultColorCenterId}`)
-      } else {
-        router.push("/mantenimientos")
+      const payload = {
+        equipo_id: formData.equipo_id,
+        empresa_id: selectedColorCenter?.empresa_id ?? undefined,
+        tipo: formData.tipo as Mantenimiento["tipo"],
+        realizado_por: formData.realizado_por,
+        fecha_mantenimiento: formData.fecha_mantenimiento,
+        descripcion: formData.descripcion.trim(),
+        piezas_cambiadas: formData.piezas_cambiadas.trim() || null,
+        tiempo_fuera_servicio: formData.tiempo_fuera_servicio ? Number(formData.tiempo_fuera_servicio) : null,
+        costo: formData.costo ? Number(formData.costo) : null,
+        estado: formData.estado as Mantenimiento["estado"],
+        notas: formData.notas.trim() || null,
       }
+
+      const endpoint = mantenimiento ? `/api/mantenimientos/${encodeURIComponent(mantenimientoId ?? mantenimiento.id)}` : "/api/mantenimientos"
+      const method = mantenimiento ? "PATCH" : "POST"
+      const res = await fetch(endpoint, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        setError(data.error ?? "Error al guardar el mantenimiento")
+        setIsSubmitting(false)
+        return
+      }
+
+      const idForRoute = data?.mantenimiento?.id ?? mantenimientoId ?? mantenimiento?.id
+      if (idForRoute) router.push(`/mantenimientos/${idForRoute}`)
+      else router.push("/mantenimientos")
       router.refresh()
     } catch (err) {
       console.error("Error saving mantenimiento:", err)
@@ -111,9 +131,19 @@ export function MantenimientoForm({
 
     setIsSubmitting(true)
     try {
-      await new Promise((resolve) => setTimeout(resolve, 1000))
-      alert("Mantenimiento marcado como completado (modo demo)")
-      router.push("/mantenimientos")
+      const endpoint = `/api/mantenimientos/${encodeURIComponent(mantenimientoId ?? mantenimiento.id)}`
+      const res = await fetch(endpoint, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ estado: "Completado" }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        setError(data.error ?? "Error al marcar como completado")
+        setIsSubmitting(false)
+        return
+      }
+      router.push(`/mantenimientos/${data?.mantenimiento?.id ?? mantenimientoId ?? mantenimiento.id}`)
       router.refresh()
     } catch (err) {
       console.error("Error marking as completed:", err)
@@ -162,10 +192,6 @@ export function MantenimientoForm({
           </div>
         </CardHeader>
         <CardContent className="space-y-4 lg:space-y-6">
-          <div className="bg-warning/10 text-warning-foreground px-4 py-3 rounded-lg text-sm border border-warning/20">
-            Modo Demo: Los cambios no se guardarán permanentemente
-          </div>
-
           {error && (
             <div className="bg-destructive/10 text-destructive px-4 py-3 rounded-lg text-sm border border-destructive/20">
               {error}

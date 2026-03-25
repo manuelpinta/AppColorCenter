@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button"
 import { IncidenciasTable } from "@/components/incidencias-table"
 import type { Incidencia, ColorCenter, Equipo } from "@/lib/types"
 import type { IncidenciaWithEmpresa, EquipoWithEmpresa } from "@/lib/types"
+import { findEquipoForMantenimientoRow } from "@/lib/data/ids"
 
 interface IncidenciasContentProps {
   incidencias: IncidenciaWithEmpresa[]
@@ -23,7 +24,7 @@ function findColorCenter(inc: IncidenciaWithEmpresa, colorCenters: ColorCenter[]
 
 function findEquipo(inc: IncidenciaWithEmpresa, equipos: EquipoWithEmpresa[]): EquipoWithEmpresa | undefined {
   if (!inc.equipo_id) return undefined
-  return equipos.find((e) => e.empresa_id === inc.empresa_id && e.id === `${inc.empresa_id}-${inc.equipo_id}`)
+  return findEquipoForMantenimientoRow(inc, equipos)
 }
 
 export function IncidenciasContent({

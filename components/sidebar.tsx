@@ -2,7 +2,17 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { LayoutDashboard, Building2, Wrench, ClipboardList, AlertTriangle, BarChart3, LogOut, LogIn } from "lucide-react"
+import {
+  LayoutDashboard,
+  Building2,
+  Wrench,
+  ClipboardList,
+  AlertTriangle,
+  BarChart3,
+  LogOut,
+  LogIn,
+  LifeBuoy,
+} from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { SessionForClient } from "@/components/app-shell"
 
@@ -15,6 +25,9 @@ const navigation = [
   { name: "Incidencias", short: "Incid.", href: "/incidencias", icon: AlertTriangle },
   { name: "Reportes", short: "Report.", href: "/reportes", icon: BarChart3 },
 ]
+
+/** URL pública (portal de tickets, mailto:..., etc.). Definir en .env: NEXT_PUBLIC_SUPPORT_URL */
+const supportUrl = process.env.NEXT_PUBLIC_SUPPORT_URL?.trim()
 
 export function Sidebar({ session }: { session: SessionForClient }) {
   const pathname = usePathname()
@@ -81,22 +94,27 @@ export function Sidebar({ session }: { session: SessionForClient }) {
                 Iniciar sesión
               </Link>
             )}
-            <p className="text-xs text-muted-foreground pt-1">Sistema de Control Técnico</p>
+            {supportUrl ? (
+              <a
+                href={supportUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground pt-1 transition-colors"
+              >
+                <LifeBuoy className="h-3.5 w-3.5 shrink-0" />
+                Soporte técnico
+              </a>
+            ) : (
+              <p className="text-xs text-muted-foreground pt-1">Sistema de Control Técnico</p>
+            )}
           </div>
         </div>
       </aside>
 
-      <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-card border-t border-border shadow-lg safe-area-inset-bottom">
-        {session?.user ? (
-          <div className="px-2 py-1 flex items-center justify-between text-[10px] text-muted-foreground border-b border-border">
-            <span className="truncate flex-1">{session.user.email ?? session.user.name ?? "Conectado"}</span>
-            <a href="/auth/logout" className="shrink-0 px-2 py-0.5 rounded hover:bg-secondary">Salir</a>
-          </div>
-        ) : (
-          <div className="px-2 py-1 text-center border-b border-border">
-            <Link href="/login" className="text-[10px] font-medium text-muted-foreground hover:text-foreground">Iniciar sesión</Link>
-          </div>
-        )}
+      <nav
+        className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-card border-t border-border shadow-lg pb-[env(safe-area-inset-bottom)]"
+        aria-label="Navegación principal"
+      >
         <div className="flex items-center justify-around px-1 py-2">
           {navigation.map((item) => {
             const isActive = pathname === item.href

@@ -2,6 +2,7 @@
 
 import { usePathname } from "next/navigation"
 import { Sidebar } from "@/components/sidebar"
+import { MobileHeader } from "@/components/mobile-header"
 
 export type SessionForClient = {
   user: { email?: string; name?: string; picture?: string; roles?: string[] }
@@ -27,8 +28,9 @@ export function AppShell({
 
   return (
     <div className="flex min-h-screen bg-background">
+      <MobileHeader session={session ?? null} />
       <Sidebar session={session ?? null} />
-      <main className="flex-1 w-full lg:ml-64 pb-20 lg:pb-0">{children}</main>
+      <main className="min-h-0 flex-1 w-full pt-14 lg:ml-64 lg:pt-0">{children}</main>
     </div>
   )
 }

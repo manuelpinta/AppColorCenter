@@ -395,7 +395,7 @@ export default async function EquipoDetailPage({ params }: { params: Promise<{ i
                     <h3 className="text-lg font-semibold text-foreground mb-2">Sin mantenimientos</h3>
                     <p className="text-muted-foreground mb-4">Este equipo no tiene mantenimientos registrados</p>
                     {canWrite && (
-                      <Link href={`/mantenimientos/crear?equipo_id=${equipo.id}`}>
+                      <Link href={`/mantenimientos/crear?equipo_id=${compositeId}`}>
                         <Button>
                           <Plus className="h-4 w-4 mr-2" />
                           Registrar Mantenimiento

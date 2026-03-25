@@ -27,3 +27,8 @@ export async function getCachedIf<T>(
   if (shouldCache) store.set(key, { data, expires: now + TTL_MS })
   return data
 }
+
+/** Invalida una entrada (p. ej. tras crear/editar un registro que alimenta un listado cacheado). */
+export function invalidateCachedList(key: string) {
+  store.delete(key)
+}

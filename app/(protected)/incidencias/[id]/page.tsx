@@ -5,6 +5,7 @@ import {
   getSucursalesByEmpresa,
   getEquipoById,
   getMantenimientosByIncidenciaId,
+  buildEquipoCompositeId,
 } from "@/lib/data"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -33,7 +34,7 @@ export default async function DetalleIncidenciaPage({ params }: { params: Promis
     ...m,
     id: `${empresaId}-${m.id}`,
   }))
-  const equipoIdForLink = equipo ? `${empresaId}-${equipo.id}` : null
+  const equipoIdForLink = equipo ? buildEquipoCompositeId(empresaId, equipo) : null
 
   const getEstadoBadge = (estado: string) => {
     switch (estado) {
@@ -83,7 +84,7 @@ export default async function DetalleIncidenciaPage({ params }: { params: Promis
               <AlertTriangle className="h-6 w-6 text-amber-600" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-foreground">Incidencia #{id}</h1>
+              <h1 className="text-2xl font-bold text-foreground">Incidencia n.º {incidencia.id}</h1>
               <p className="text-sm text-muted-foreground">
                 {new Date(incidencia.fecha_reporte).toLocaleDateString("es-ES", {
                   weekday: "long",

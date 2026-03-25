@@ -80,6 +80,7 @@ export function IncidenciaForm({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           sucursal_id: sucursalId,
+          empresa_id: sucursalSeleccionada?.empresa_id,
           equipo_id: equipoId || null,
           fecha_reporte: formData.fecha_reporte,
           descripcion: formData.descripcion.trim(),
@@ -120,10 +121,6 @@ export function IncidenciaForm({
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="bg-amber-50 dark:bg-amber-950/30 text-amber-800 dark:text-amber-200 px-4 py-3 rounded-lg text-sm border border-amber-200 dark:border-amber-800">
-            Modo Demo: Los datos se agregan al listado en esta sesión.
-          </div>
-
           {error && (
             <div className="bg-destructive/10 text-destructive px-4 py-3 rounded-lg text-sm border border-destructive/20">
               {error}
@@ -154,7 +151,7 @@ export function IncidenciaForm({
                     <CommandGroup>
                       {colorCenters.map((cc) => (
                         <CommandItem
-                          key={cc.id}
+                          key={`${cc.empresa_id}-${cc.id}`}
                           value={`${cc.nombre_sucursal} ${cc.codigo_interno}`}
                           onSelect={() => {
                             setSucursalId(cc.id)

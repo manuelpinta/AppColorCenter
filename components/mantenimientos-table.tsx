@@ -1,8 +1,9 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import type { Mantenimiento, ColorCenter } from "@/lib/types"
+import type { ColorCenter } from "@/lib/types"
 import type { MantenimientoWithEmpresa, EquipoWithEmpresa } from "@/lib/types"
+import { findEquipoForMantenimientoRow } from "@/lib/data/ids"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -19,7 +20,7 @@ interface MantenimientosTableProps {
 }
 
 function findEquipo(mant: MantenimientoWithEmpresa, equipos: EquipoWithEmpresa[]): EquipoWithEmpresa | undefined {
-  return equipos.find((e) => e.empresa_id === mant.empresa_id && e.id === `${mant.empresa_id}-${mant.equipo_id}`)
+  return findEquipoForMantenimientoRow(mant, equipos)
 }
 
 function findCC(equipo: EquipoWithEmpresa, colorCenters: ColorCenter[]): ColorCenter | undefined {
@@ -242,7 +243,9 @@ export function MantenimientosTable({ mantenimientos, equipos, colorCenters, can
                     {new Date(mant.fecha_mantenimiento).toLocaleDateString("es-ES")}
                   </td>
                   <td className="py-3 px-4 text-muted-foreground">
-                    {equipo?.tipo_equipo} - {equipo?.marca}
+                    {equipo
+                      ? `${equipo.tipo_equipo}${equipo.marca ? ` - ${equipo.marca}` : ""}`
+                      : `#${mant.equipo_id}`}
                   </td>
                   <td className="py-3 px-4 text-muted-foreground">{colorCenter?.nombre_sucursal || "-"}</td>
                   <td className="py-3 px-4">{getTipoBadge(mant.tipo)}</td>
