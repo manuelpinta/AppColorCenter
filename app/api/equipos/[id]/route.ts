@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { getPool, isEmpresaAllowedForRequest } from "@/lib/db"
 import { actualizarEquipo, actualizarComputadora } from "@/lib/data"
 import type { Equipo } from "@/lib/types"
-import { userCanWrite } from "@/lib/auth-roles"
+import { userCanEditNormatividadFields, userCanWrite } from "@/lib/auth-roles"
 
 const equipoAllowed = [
   "color_center_id", "tipo_equipo", "marca", "modelo", "numero_serie", "fecha_compra",
@@ -15,11 +15,22 @@ const computadoraAllowed = [
   "windows_version", "so_64bits",
 ] as const
 
+const normatividadAllowed = [
+  "fecha_compra",
+  "tipo_propiedad",
+  "arrendador",
+  "fecha_vencimiento_arrendamiento",
+] as const
+
 export async function PATCH(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  if (!(await userCanWrite())) {
+  const [canWrite, canEditNormatividad] = await Promise.all([
+    userCanWrite(),
+    userCanEditNormatividadFields(),
+  ])
+  if (!canWrite && !canEditNormatividad) {
     return NextResponse.json({ error: "No tienes permisos para actualizar equipos" }, { status: 403 })
   }
 
@@ -41,14 +52,15 @@ export async function PATCH(
     return NextResponse.json({ error: "No tienes acceso a esta empresa" }, { status: 403 })
   }
   const data: Record<string, unknown> = {}
-  for (const key of equipoAllowed) {
+  const allowedFields = canWrite ? equipoAllowed : normatividadAllowed
+  for (const key of allowedFields) {
     if (body[key] !== undefined) data[key] = body[key]
   }
   try {
     const pool = await getPool(empresaId)
     const equipo = await actualizarEquipo(pool, id, data as Partial<Omit<Equipo, "id" | "created_at">>)
     const computadoraPayload = body.computadora
-    if (equipo.tipo_equipo === "Equipo de Computo" && computadoraPayload && typeof computadoraPayload === "object") {
+    if (canWrite && equipo.tipo_equipo === "Equipo de Computo" && computadoraPayload && typeof computadoraPayload === "object") {
       const comp: Record<string, unknown> = {}
       for (const key of computadoraAllowed) {
         if ((computadoraPayload as Record<string, unknown>)[key] !== undefined) {

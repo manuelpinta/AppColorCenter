@@ -14,7 +14,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { EquipoFotosSection } from "@/components/equipo-fotos-section"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { userCanWrite } from "@/lib/auth-roles"
+import { userCanEditNormatividadFields, userCanWrite } from "@/lib/auth-roles"
 import {
   ArrowLeft,
   ArrowRightLeft,
@@ -37,7 +37,11 @@ import {
 
 export default async function EquipoDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
-  const canWrite = await userCanWrite()
+  const [canWrite, canEditNormatividad] = await Promise.all([
+    userCanWrite(),
+    userCanEditNormatividadFields(),
+  ])
+  const canEditEquipoFields = canWrite || canEditNormatividad
   // Temporal: ocultar datos de arrendamiento y calibracion/revision en UI.
   const showLeasingInfo = false
   const showCalibrationInfo = false
@@ -145,7 +149,7 @@ export default async function EquipoDetailPage({ params }: { params: Promise<{ i
             </div>
 
             <div className="flex flex-col sm:flex-row flex-wrap gap-2">
-              {canWrite && (
+              {canEditEquipoFields && (
                 <>
                   <Link href={`/equipos/${compositeId}/editar`} className="flex-1 min-w-0 sm:flex-initial">
                     <Button
@@ -157,6 +161,10 @@ export default async function EquipoDetailPage({ params }: { params: Promise<{ i
                       Editar
                     </Button>
                   </Link>
+                </>
+              )}
+              {canWrite && (
+                <>
                   <Link href={`/equipos/${compositeId}/mover`} className="flex-1 min-w-0 sm:flex-initial">
                     <Button
                       variant="outline"
