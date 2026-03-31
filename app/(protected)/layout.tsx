@@ -4,6 +4,8 @@ import { auth0 } from "@/lib/auth0"
 import { getCachedAllowedEmpresaIds } from "@/lib/allowed-empresas-context"
 import { isAuth0OrganizationsEnabled } from "@/lib/auth0-organizations"
 
+export const dynamic = "force-dynamic"
+
 /**
  * Rutas protegidas: sin sesión no existe la app.
  * Redirige a /login antes de renderizar cualquier página (no se ejecutan fetches ni páginas).
