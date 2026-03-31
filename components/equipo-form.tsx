@@ -44,6 +44,8 @@ interface EquipoFormProps {
   empresaId?: string
   /** Para edición multi-DB: id compuesto para el redirect (ej. emp-1-42). */
   equipoIdForLink?: string
+  /** Si es true, solo permite editar datos de compra/arrendamiento. */
+  normatividadMode?: boolean
 }
 
 function getInitialEmpresaAndZona(
@@ -80,11 +82,13 @@ export function EquipoForm({
   computadoraInicial: computadoraInicialProp,
   empresaId: empresaIdProp,
   equipoIdForLink,
+  normatividadMode = false,
 }: EquipoFormProps) {
   const router = useRouter()
-  // Temporal: ocultar arrendamiento y calibracion/revision en formulario.
-  const showLeasingFields = false
+  // Temporal: ocultar arrendamiento; se habilita para normatividad.
+  const showLeasingFields = normatividadMode
   const showCalibrationFields = false
+  const isRestrictedEdit = Boolean(equipo && normatividadMode)
   const errorRef = useRef<HTMLDivElement>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -276,23 +280,31 @@ export function EquipoForm({
       const arrendadorNombre = catalogArrendadores.find((a) => a.id === formData.arrendador_id)?.nombre || null
 
       if (equipo) {
-        const body: Record<string, unknown> = {
-          color_center_id: formData.color_center_id,
-          tipo_equipo: formData.tipo_equipo,
-          marca: marcaNombre,
-          modelo: modeloNombre,
-          numero_serie: isComputo ? null : formData.numero_serie || null,
-          fecha_compra: isComputo ? null : formData.fecha_compra || null,
-          tipo_propiedad: formData.tipo_propiedad,
-          arrendador: formData.tipo_propiedad === "Arrendado" ? arrendadorNombre : null,
-          fecha_vencimiento_arrendamiento:
-            formData.tipo_propiedad === "Arrendado" ? formData.fecha_vencimiento_arrendamiento || null : null,
-          estado: formData.estado,
-          ultima_calibracion: isComputo ? null : formData.ultima_calibracion || null,
-          proxima_revision: isComputo ? null : formData.proxima_revision || null,
-          notas: formData.notas || null,
-        }
-        if (formData.tipo_equipo === "Equipo de Computo") {
+        const body: Record<string, unknown> = isRestrictedEdit
+          ? {
+              fecha_compra: formData.fecha_compra || null,
+              tipo_propiedad: formData.tipo_propiedad,
+              arrendador: formData.tipo_propiedad === "Arrendado" ? arrendadorNombre : null,
+              fecha_vencimiento_arrendamiento:
+                formData.tipo_propiedad === "Arrendado" ? formData.fecha_vencimiento_arrendamiento || null : null,
+            }
+          : {
+              color_center_id: formData.color_center_id,
+              tipo_equipo: formData.tipo_equipo,
+              marca: marcaNombre,
+              modelo: modeloNombre,
+              numero_serie: isComputo ? null : formData.numero_serie || null,
+              fecha_compra: isComputo ? null : formData.fecha_compra || null,
+              tipo_propiedad: formData.tipo_propiedad,
+              arrendador: formData.tipo_propiedad === "Arrendado" ? arrendadorNombre : null,
+              fecha_vencimiento_arrendamiento:
+                formData.tipo_propiedad === "Arrendado" ? formData.fecha_vencimiento_arrendamiento || null : null,
+              estado: formData.estado,
+              ultima_calibracion: isComputo ? null : formData.ultima_calibracion || null,
+              proxima_revision: isComputo ? null : formData.proxima_revision || null,
+              notas: formData.notas || null,
+            }
+        if (!isRestrictedEdit && formData.tipo_equipo === "Equipo de Computo") {
           body.computadora = {
             procesador: formData.computadora.procesador || null,
             ram_gb: formData.computadora.ram_gb === "" ? null : formData.computadora.ram_gb,
@@ -512,7 +524,7 @@ export function EquipoForm({
                     : {}),
                 })
               }
-              disabled={!empresaId || catalogLoading}
+              disabled={isRestrictedEdit || !empresaId || catalogLoading}
             >
               <SelectTrigger id="tipo_equipo">
                 <SelectValue placeholder={!empresaId ? "Primero selecciona empresa" : catalogLoading ? "Cargando..." : "Selecciona el tipo"} />
@@ -539,7 +551,7 @@ export function EquipoForm({
                     options={marcaOptions}
                     placeholder={!empresaId ? "Primero selecciona empresa" : catalogLoading ? "Cargando..." : "Selecciona marca..."}
                     searchPlaceholder="Buscar marca..."
-                    disabled={!empresaId || catalogLoading}
+                    disabled={isRestrictedEdit || !empresaId || catalogLoading}
                     emptyText="No hay marcas con ese nombre."
                   />
                 </div>
@@ -550,7 +562,7 @@ export function EquipoForm({
                     onValueChange={(v) => setFormData({ ...formData, modelo_id: v })}
                     options={modeloOptions}
                     placeholder={!empresaId ? "Primero selecciona empresa" : !formData.marca_id ? "Primero selecciona marca" : "Selecciona modelo..."}
-                    disabled={!empresaId || !formData.marca_id || catalogLoading}
+                    disabled={isRestrictedEdit || !empresaId || !formData.marca_id || catalogLoading}
                     searchPlaceholder="Buscar modelo..."
                     emptyText="No hay modelos para esta marca."
                   />
@@ -563,6 +575,7 @@ export function EquipoForm({
                   value={formData.numero_serie}
                   onChange={(e) => setFormData({ ...formData, numero_serie: e.target.value })}
                   placeholder="Ej: TM-001-2024"
+                  disabled={isRestrictedEdit}
                 />
               </div>
               <div className="space-y-2">
@@ -583,6 +596,7 @@ export function EquipoForm({
                       onValueChange={(value: "Propio" | "Arrendado") =>
                         setFormData({ ...formData, tipo_propiedad: value, arrendador_id: value === "Propio" ? "" : formData.arrendador_id })
                       }
+                      disabled={!equipo && formData.tipo_equipo === "Equipo de Computo"}
                     >
                       <SelectTrigger id="tipo_propiedad">
                         <SelectValue placeholder="¿Propio o arrendado?" />
@@ -628,7 +642,11 @@ export function EquipoForm({
           {/* Estado */}
           <div className="space-y-2">
             <Label htmlFor="estado">Estado <span className="text-destructive">*</span></Label>
-            <Select value={formData.estado} onValueChange={(value) => setFormData({ ...formData, estado: value })}>
+            <Select
+              value={formData.estado}
+              onValueChange={(value) => setFormData({ ...formData, estado: value })}
+              disabled={isRestrictedEdit}
+            >
               <SelectTrigger id="estado">
                 <SelectValue />
               </SelectTrigger>
@@ -664,6 +682,7 @@ export function EquipoForm({
                       })
                     }
                     placeholder="Ej: Intel Core i5 ≥ 3.0 GHz"
+                    disabled={isRestrictedEdit}
                   />
                 </div>
                 <div className="space-y-2">
@@ -682,6 +701,7 @@ export function EquipoForm({
                       })
                     }}
                     placeholder="Ej: 16"
+                    disabled={isRestrictedEdit}
                   />
                 </div>
                 <div className="space-y-2">
@@ -699,6 +719,7 @@ export function EquipoForm({
                       })
                     }}
                     placeholder="Ej: 450 o 512"
+                    disabled={isRestrictedEdit}
                   />
                 </div>
                 <div className="space-y-2">
@@ -711,6 +732,7 @@ export function EquipoForm({
                         computadora: { ...formData.computadora, tipo_almacenamiento: v },
                       })
                     }
+                    disabled={isRestrictedEdit}
                   >
                     <SelectTrigger id="tipo_almacenamiento">
                       <SelectValue placeholder="SSD o HDD" />
@@ -733,6 +755,7 @@ export function EquipoForm({
                       })
                     }
                     placeholder="Ej: Intel HD 530, Nvidia, AMD compatible"
+                    disabled={isRestrictedEdit}
                   />
                 </div>
                 <div className="space-y-2">
@@ -747,6 +770,7 @@ export function EquipoForm({
                       })
                     }
                     placeholder="Ej: Windows 11 Pro 23H2"
+                    disabled={isRestrictedEdit}
                   />
                 </div>
                 <div className="flex items-center space-x-2 pt-6">
@@ -759,6 +783,7 @@ export function EquipoForm({
                         computadora: { ...formData.computadora, so_64bits: checked === true },
                       })
                     }
+                    disabled={isRestrictedEdit}
                   />
                   <Label htmlFor="so_64bits" className="text-sm font-normal cursor-pointer">
                     Sistema operativo 64 bits
@@ -801,6 +826,7 @@ export function EquipoForm({
               onChange={(e) => setFormData({ ...formData, notas: e.target.value })}
               placeholder="Información adicional sobre el equipo..."
               rows={4}
+              disabled={isRestrictedEdit}
             />
           </div>
 
