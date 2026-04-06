@@ -32,6 +32,16 @@ URLs típicas (ajusta dominio/puerto según tu entorno):
 
 Mientras uses las rutas que monta el SDK (`/auth/login`, `/auth/logout`, `/auth/callback`), no necesitas tocar código para los redirects; solo asegurarte de que las URLs anteriores están en la app de Auth0.
 
+### 2.1.1. Sin registro público (solo usuarios dados de alta)
+
+La pantalla de login de la app solo ofrece **Iniciar sesión** (no enlaza a flujo de registro con `screen_hint=signup`).
+
+En el **Auth0 Dashboard** conviene reforzar lo mismo para que nadie se auto-registre:
+
+- **Authentication → Database** → tu conexión (p. ej. *Username-Password-Authentication*) → activa **Disable Sign Ups** (los usuarios nuevos se crean desde el panel o por invitación, según tu proceso).
+- Revisa también **Authentication → Social** y las políticas de cada conexión si aplica.
+- En **Branding → Universal Login**, comprueba que no quede una pestaña de “Sign up” visible si tu tenant la expone; con “Disable Sign Ups” en la base de datos suele bastar para el flujo local.
+
 ### 2.2. Variables de entorno básicas
 
 En `.env` (solo servidor, nunca subir a git):
