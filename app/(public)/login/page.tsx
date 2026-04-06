@@ -34,13 +34,11 @@ export default async function LoginPage() {
           <Button asChild className="w-full" size="lg">
             <a href="/auth/login">Iniciar sesión</a>
           </Button>
-          <Button asChild variant="outline" className="w-full" size="lg">
-            <a href="/auth/login?screen_hint=signup">Registrarse</a>
-          </Button>
         </div>
 
         <p className="text-center text-xs text-muted-foreground">
-          Serás redirigido a Auth0 para autenticarte de forma segura.
+          Serás redirigido a Auth0 para autenticarte de forma segura. Las cuentas nuevas las gestiona el administrador;
+          no hay registro público.
         </p>
       </div>
     </div>
