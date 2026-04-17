@@ -23,6 +23,7 @@
 | Archivo | Uso |
 |---------|-----|
 | **Auth0.md** | Documento maestro de Auth0: configuración base, variables de entorno, roles y Organizations por empresa. |
+| **Auth0-global-multiapp.md** | Guia global reusable para varias apps/APIs: audience (`pintauth-api`), roles, Organizations y patron backend por empresa. |
 
 ---
 

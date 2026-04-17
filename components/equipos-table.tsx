@@ -50,6 +50,11 @@ export function EquiposTable({ equipos, colorCenters, canWrite }: EquiposTablePr
       return true
     })
   }, [equipos, filterTipo, filterEstado])
+  const hasColumnFilters = filterTipo !== null || filterEstado !== null
+  const clearColumnFilters = () => {
+    setFilterTipo(null)
+    setFilterEstado(null)
+  }
 
   const handleSort = (key: string) => {
     setSortBy((prev) => {
@@ -135,8 +140,11 @@ export function EquiposTable({ equipos, colorCenters, canWrite }: EquiposTablePr
 
   if (sortedEquipos.length === 0) {
     return (
-      <div className="text-center py-8 text-muted-foreground text-sm">
-        Ningún equipo coincide con los filtros de columna.
+      <div className="text-center py-8 text-muted-foreground text-sm space-y-3">
+        <p>Ningún equipo coincide con los filtros de columna.</p>
+        <Button variant="outline" size="sm" onClick={clearColumnFilters}>
+          Limpiar filtros de columna
+        </Button>
       </div>
     )
   }
@@ -188,6 +196,13 @@ export function EquiposTable({ equipos, colorCenters, canWrite }: EquiposTablePr
 
       {/* Desktop: tabla */}
       <div className="hidden md:block overflow-x-auto">
+        {hasColumnFilters && (
+          <div className="mb-2 flex justify-end">
+            <Button variant="ghost" size="sm" onClick={clearColumnFilters}>
+              Limpiar filtros de columna
+            </Button>
+          </div>
+        )}
         <table className="w-full">
           <thead>
             <tr className="border-b border-border">

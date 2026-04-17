@@ -1,6 +1,8 @@
 import type { Pool } from "mysql2/promise"
 import { rowToApp, rowsToApp } from "./helpers"
 
+type MarcaTipoRow = { marca_id: number; tipo_equipo_id: number }
+
 /** Lee nombres de un catálogo (activos). */
 export async function getCatalogoNombres(
   pool: Pool,
@@ -22,6 +24,23 @@ export async function getTiposEquipo(pool: Pool): Promise<string[]> {
 export async function getMarcasEquipo(pool: Pool): Promise<{ id: string; nombre: string }[]> {
   const [rows] = await pool.query<{ id: number; nombre: string }[]>(
     "SELECT id, nombre FROM marcas_equipo WHERE activo = 1 ORDER BY nombre"
+  )
+  const arr = Array.isArray(rows) ? rows : []
+  return arr.map((r) => ({ id: String(r.id), nombre: r.nombre }))
+}
+
+/** Marcas activas filtradas por tipo de equipo. */
+export async function getMarcasEquipoByTipo(
+  pool: Pool,
+  tipoEquipoId: string
+): Promise<{ id: string; nombre: string }[]> {
+  const [rows] = await pool.query<{ id: number; nombre: string }[]>(
+    `SELECT m.id, m.nombre
+     FROM marcas_equipo m
+     JOIN marca_tipo_equipo mt ON mt.marca_id = m.id
+     WHERE m.activo = 1 AND mt.activo = 1 AND mt.tipo_equipo_id = ?
+     ORDER BY m.nombre`,
+    [tipoEquipoId]
   )
   const arr = Array.isArray(rows) ? rows : []
   return arr.map((r) => ({ id: String(r.id), nombre: r.nombre }))
@@ -54,12 +73,27 @@ export async function getModelosAll(
 /** Marcas para admin (incluye inactivos). */
 export async function getMarcasEquipoParaAdmin(
   pool: Pool
-): Promise<{ id: string; nombre: string; activo: number }[]> {
+): Promise<{ id: string; nombre: string; activo: number; tipo_equipo_ids: string[] }[]> {
   const [rows] = await pool.query<{ id: number; nombre: string; activo: number }[]>(
     "SELECT id, nombre, activo FROM marcas_equipo ORDER BY nombre"
   )
+  const [relRows] = await pool.query<MarcaTipoRow[]>(
+    "SELECT marca_id, tipo_equipo_id FROM marca_tipo_equipo WHERE activo = 1"
+  )
+  const relArr = Array.isArray(relRows) ? relRows : []
+  const tipoIdsByMarca = new Map<number, string[]>()
+  for (const rel of relArr) {
+    const prev = tipoIdsByMarca.get(rel.marca_id) ?? []
+    prev.push(String(rel.tipo_equipo_id))
+    tipoIdsByMarca.set(rel.marca_id, prev)
+  }
   const arr = Array.isArray(rows) ? rows : []
-  return arr.map((r) => ({ id: String(r.id), nombre: r.nombre, activo: Number(r.activo) || 0 }))
+  return arr.map((r) => ({
+    id: String(r.id),
+    nombre: r.nombre,
+    activo: Number(r.activo) || 0,
+    tipo_equipo_ids: tipoIdsByMarca.get(r.id) ?? [],
+  }))
 }
 
 /** Modelos para admin (incluye inactivos). */
@@ -110,10 +144,18 @@ export async function getArrendadores(pool: Pool): Promise<{ id: string; nombre:
 }
 
 /** Crear marca y devolverla. */
-export async function crearMarca(pool: Pool, nombre: string): Promise<{ id: string; nombre: string }> {
+export async function crearMarca(
+  pool: Pool,
+  nombre: string,
+  tipoEquipoIds?: string[]
+): Promise<{ id: string; nombre: string; tipo_equipo_ids: string[] }> {
   const [result] = await pool.query<{ insertId: number }>("INSERT INTO marcas_equipo (nombre) VALUES (?)", [nombre])
   const insertId = result?.insertId ?? 0
-  return { id: String(insertId), nombre }
+  const normalized = normalizeTipoEquipoIds(tipoEquipoIds)
+  if (normalized.length > 0) {
+    await assignMarcaToTipos(pool, String(insertId), normalized)
+  }
+  return { id: String(insertId), nombre, tipo_equipo_ids: normalized }
 }
 
 /** Crear modelo y devolverlo. */
@@ -151,13 +193,24 @@ export async function crearTipoEquipo(pool: Pool, nombre: string): Promise<{ id:
 export async function getMarcaById(
   pool: Pool,
   id: string
-): Promise<{ id: string; nombre: string; activo: number } | null> {
+): Promise<{ id: string; nombre: string; activo: number; tipo_equipo_ids: string[] } | null> {
   const [rows] = await pool.query<{ id: number; nombre: string; activo: number }[]>(
     "SELECT id, nombre, activo FROM marcas_equipo WHERE id = ?",
     [id]
   )
   const r = Array.isArray(rows) && rows[0] ? rows[0] : null
-  return r ? { id: String(r.id), nombre: r.nombre, activo: Number(r.activo) || 0 } : null
+  if (!r) return null
+  const [relRows] = await pool.query<{ tipo_equipo_id: number }[]>(
+    "SELECT tipo_equipo_id FROM marca_tipo_equipo WHERE marca_id = ? AND activo = 1 ORDER BY tipo_equipo_id",
+    [id]
+  )
+  const relArr = Array.isArray(relRows) ? relRows : []
+  return {
+    id: String(r.id),
+    nombre: r.nombre,
+    activo: Number(r.activo) || 0,
+    tipo_equipo_ids: relArr.map((x) => String(x.tipo_equipo_id)),
+  }
 }
 
 /** Un modelo por id (para replicar tras actualizar). */
@@ -210,7 +263,7 @@ export async function getTipoEquipoById(
 export async function actualizarMarca(
   pool: Pool,
   id: string,
-  data: { nombre?: string; activo?: number }
+  data: { nombre?: string; activo?: number; tipo_equipo_ids?: string[] }
 ): Promise<void> {
   const updates: string[] = []
   const values: unknown[] = []
@@ -223,8 +276,29 @@ export async function actualizarMarca(
     values.push(data.activo)
   }
   if (updates.length === 0) return
-  values.push(id)
-  await pool.query(`UPDATE marcas_equipo SET ${updates.join(", ")} WHERE id = ?`, values)
+  if (updates.length > 0) {
+    values.push(id)
+    await pool.query(`UPDATE marcas_equipo SET ${updates.join(", ")} WHERE id = ?`, values)
+  }
+  if (data.tipo_equipo_ids !== undefined) {
+    await assignMarcaToTipos(pool, id, normalizeTipoEquipoIds(data.tipo_equipo_ids))
+  }
+}
+
+export async function assignMarcaToTipos(pool: Pool, marcaId: string, tipoEquipoIds: string[]): Promise<void> {
+  const normalized = normalizeTipoEquipoIds(tipoEquipoIds)
+  await pool.query("DELETE FROM marca_tipo_equipo WHERE marca_id = ?", [marcaId])
+  for (const tipoId of normalized) {
+    await pool.query(
+      "INSERT INTO marca_tipo_equipo (marca_id, tipo_equipo_id, activo) VALUES (?, ?, 1)",
+      [marcaId, tipoId]
+    )
+  }
+}
+
+function normalizeTipoEquipoIds(ids?: string[]): string[] {
+  if (!Array.isArray(ids)) return []
+  return Array.from(new Set(ids.map((x) => x.trim()).filter((x) => /^\d+$/.test(x))))
 }
 
 /** Actualizar modelo en el maestro. */

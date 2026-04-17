@@ -4,8 +4,10 @@ import { useState, useMemo } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Search, CalendarClock } from "lucide-react"
+import { Search, CalendarClock, X } from "lucide-react"
 import { Checkbox } from "@/components/ui/checkbox"
+import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
 import { EquiposTable } from "@/components/equipos-table"
 import { SucursalFilterCombobox } from "@/components/sucursal-filter-combobox"
 import type { Equipo, ColorCenter } from "@/lib/types"
@@ -61,6 +63,18 @@ export function EquiposContent({ equipos, colorCenters, canWrite }: EquiposConte
       return matchSearch && matchSucursal && matchPropiedad && matchPorVencer
     })
   }, [equipos, colorCenters, search, sucursalId, propiedad, soloPorVencer])
+  const activeFilters = [
+    search.trim() ? `Busqueda: ${search.trim()}` : null,
+    sucursalId !== "all" ? "Sucursal" : null,
+    propiedad !== "all" ? `Propiedad: ${propiedad}` : null,
+    soloPorVencer ? "Por vencer" : null,
+  ].filter(Boolean) as string[]
+  const clearFilters = () => {
+    setSearch("")
+    setSucursalId("all")
+    setPropiedad("all")
+    setSoloPorVencer(false)
+  }
 
   return (
     <Card>
@@ -70,7 +84,20 @@ export function EquiposContent({ equipos, colorCenters, canWrite }: EquiposConte
             Todos los Equipos ({filteredEquipos.length}
             {filteredEquipos.length !== equipos.length ? ` de ${equipos.length}` : ""})
           </CardTitle>
+          {activeFilters.length > 0 && (
+            <Button variant="ghost" size="sm" onClick={clearFilters}>
+              <X className="h-4 w-4 mr-1" />
+              Limpiar filtros
+            </Button>
+          )}
         </div>
+        {activeFilters.length > 0 && (
+          <div className="flex flex-wrap gap-2">
+            {activeFilters.map((f) => (
+              <Badge key={f} variant="secondary">{f}</Badge>
+            ))}
+          </div>
+        )}
 
         <div className="flex flex-col gap-3 w-full">
           <div className="relative w-full max-w-md">

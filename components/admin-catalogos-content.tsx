@@ -1,11 +1,12 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import {
   Table,
   TableBody,
@@ -22,10 +23,12 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Loader2, Plus, Pencil, Power, PowerOff } from "lucide-react"
+import { Badge } from "@/components/ui/badge"
 
 const INACTIVOS = "?incluir_inactivos=1"
 
 type ItemSimple = { id: string; nombre: string; activo?: number }
+type MarcaItem = ItemSimple & { tipo_equipo_ids?: string[] }
 type ModeloItem = { id: string; marca_id: string; nombre: string; activo?: number }
 
 async function apiGet<T>(path: string): Promise<T> {
@@ -104,7 +107,7 @@ export function AdminCatalogosContent() {
     loading: loadingMarcas,
     error: errorMarcas,
     refetch: refetchMarcas,
-  } = useCatalogList<ItemSimple>(`/api/catalogos/marcas${INACTIVOS}`)
+  } = useCatalogList<MarcaItem>(`/api/catalogos/marcas${INACTIVOS}`)
 
   const {
     items: modelos,
@@ -121,6 +124,7 @@ export function AdminCatalogosContent() {
   } = useCatalogList<ItemSimple>(`/api/catalogos/arrendadores${INACTIVOS}`)
 
   const marcasMap = Object.fromEntries(marcas.map((m) => [m.id, m.nombre]))
+  const tiposMap = Object.fromEntries(tipos.map((t) => [t.id, t.nombre]))
 
   // Edit dialog
   type EditKind = "tipo" | "marca" | "modelo" | "arrendador"
@@ -129,14 +133,16 @@ export function AdminCatalogosContent() {
   const [editId, setEditId] = useState("")
   const [editNombre, setEditNombre] = useState("")
   const [editMarcaId, setEditMarcaId] = useState("")
+  const [editMarcaTipos, setEditMarcaTipos] = useState<string[]>([])
   const [editSubmitting, setEditSubmitting] = useState(false)
   const [editError, setEditError] = useState<string | null>(null)
 
-  function openEdit(kind: EditKind, id: string, nombre: string, marcaId?: string) {
+  function openEdit(kind: EditKind, id: string, nombre: string, marcaId?: string, tipoIds?: string[]) {
     setEditKind(kind)
     setEditId(id)
     setEditNombre(nombre)
     setEditMarcaId(marcaId ?? "")
+    setEditMarcaTipos(tipoIds ?? [])
     setEditError(null)
     setEditOpen(true)
   }
@@ -144,6 +150,10 @@ export function AdminCatalogosContent() {
   async function handleSaveEdit() {
     const nombre = editNombre.trim()
     if (!nombre) return
+    if (editKind === "marca" && editMarcaTipos.length === 0) {
+      setEditError("Selecciona al menos un tipo de equipo para esta marca.")
+      return
+    }
     setEditSubmitting(true)
     setEditError(null)
     try {
@@ -155,8 +165,9 @@ export function AdminCatalogosContent() {
             : editKind === "modelo"
               ? `/api/catalogos/modelos/${editId}`
               : `/api/catalogos/arrendadores/${editId}`
-      const body: { nombre: string; marca_id?: string } = { nombre }
+      const body: { nombre: string; marca_id?: string; tipo_equipo_ids?: string[] } = { nombre }
       if (editKind === "modelo" && editMarcaId) body.marca_id = editMarcaId
+      if (editKind === "marca") body.tipo_equipo_ids = editMarcaTipos
       await apiPatch(path, body)
       setEditOpen(false)
       if (editKind === "tipo") refetchTipos()
@@ -198,6 +209,8 @@ export function AdminCatalogosContent() {
   // Form state
   const [newNombre, setNewNombre] = useState("")
   const [newModeloMarcaId, setNewModeloMarcaId] = useState("")
+  const [newMarcaTipos, setNewMarcaTipos] = useState<string[]>([])
+  const [searchText, setSearchText] = useState("")
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
 
@@ -227,8 +240,9 @@ export function AdminCatalogosContent() {
     setSubmitting(true)
     setSubmitError(null)
     try {
-      await apiPost("/api/catalogos/marcas", { nombre })
+      await apiPost("/api/catalogos/marcas", { nombre, tipo_equipo_ids: newMarcaTipos })
       setNewNombre("")
+      setNewMarcaTipos([])
       refetchMarcas()
     } catch (e) {
       setSubmitError(e instanceof Error ? e.message : "Error")
@@ -271,6 +285,13 @@ export function AdminCatalogosContent() {
 
   return (
     <div className="space-y-6">
+      <div className="max-w-sm">
+        <Input
+          placeholder="Buscar en catálogo..."
+          value={searchText}
+          onChange={(e) => setSearchText(e.target.value)}
+        />
+      </div>
       <p className="text-sm text-muted-foreground">
         Los cambios se guardan en la base maestra (Pintacomex) y se replican al resto de empresas.
       </p>
@@ -351,16 +372,46 @@ export function AdminCatalogosContent() {
 
         <TabsContent value="marcas" className="mt-6">
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle>Marcas de equipo</CardTitle>
-              <div className="flex items-center gap-2">
+            <CardHeader className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between space-y-0 pb-2">
+              <div className="space-y-1 min-w-0 flex-1">
+                <CardTitle>Marcas de equipo</CardTitle>
+                <CardDescription>
+                  Cada marca se asocia a uno o más <strong className="text-foreground font-medium">tipos de equipo</strong> (tabla{" "}
+                  <code className="text-xs bg-muted px-1 rounded">marca_tipo_equipo</code>). Eso define qué marcas aparecen al elegir el tipo en el alta de equipos.{" "}
+                  Para ver o cambiar las relaciones: columna <strong className="text-foreground font-medium">Tipos</strong>, o el lápiz (nombre + tipos).
+                </CardDescription>
+              </div>
+              <div className="flex flex-wrap items-center gap-2 shrink-0">
                 <Input
                   placeholder="Nueva marca"
                   value={activeTab === "marcas" ? newNombre : ""}
                   onChange={(e) => setNewNombre(e.target.value)}
                   className="max-w-[200px]"
                 />
-                <Button size="sm" onClick={handleCreateMarca} disabled={submitting || !newNombre.trim()}>
+                <Select
+                  value=""
+                  onValueChange={(value) => {
+                    setNewMarcaTipos((prev) => (prev.includes(value) ? prev.filter((x) => x !== value) : [...prev, value]))
+                  }}
+                >
+                  <SelectTrigger className="w-[220px]">
+                    <SelectValue
+                      placeholder={
+                        newMarcaTipos.length === 0
+                          ? "Elegir tipos (obligatorio)"
+                          : `${newMarcaTipos.length} tipo(s) seleccionado(s)`
+                      }
+                    />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {tipos.map((t) => (
+                      <SelectItem key={t.id} value={t.id}>
+                        {newMarcaTipos.includes(t.id) ? `✓ ${t.nombre}` : t.nombre}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button size="sm" onClick={handleCreateMarca} disabled={submitting || !newNombre.trim() || newMarcaTipos.length === 0}>
                   {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
                   Agregar
                 </Button>
@@ -378,21 +429,43 @@ export function AdminCatalogosContent() {
                     <TableRow>
                       <TableHead>Id</TableHead>
                       <TableHead>Nombre</TableHead>
+                      <TableHead className="min-w-[200px]">Tipos de equipo (relación)</TableHead>
                       <TableHead>Activo</TableHead>
-                      <TableHead className="w-[120px]">Acciones</TableHead>
+                      <TableHead className="w-[140px]">Acciones</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {marcas.map((m) => {
+                    {marcas.filter((m) => m.nombre.toLowerCase().includes(searchText.toLowerCase())).map((m) => {
                       const activo = m.activo ?? 1
                       return (
                         <TableRow key={m.id} className={activo === 0 ? "opacity-60" : ""}>
                           <TableCell className="font-mono text-muted-foreground">{m.id}</TableCell>
                           <TableCell>{m.nombre}</TableCell>
+                          <TableCell>
+                            {(m.tipo_equipo_ids ?? []).length > 0 ? (
+                              <div className="flex flex-wrap gap-1 max-w-md">
+                                {(m.tipo_equipo_ids ?? []).map((id) => (
+                                  <Badge key={id} variant="secondary" className="font-normal">
+                                    {tiposMap[id] ?? id}
+                                  </Badge>
+                                ))}
+                              </div>
+                            ) : (
+                              <span className="text-muted-foreground text-sm">
+                                Sin tipos — edita con el lápiz y marca al menos un tipo
+                              </span>
+                            )}
+                          </TableCell>
                           <TableCell>{activo === 1 ? "Sí" : "No"}</TableCell>
                           <TableCell>
                             <div className="flex items-center gap-1">
-                              <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={() => openEdit("marca", m.id, m.nombre)} title="Editar">
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-8 w-8 p-0"
+                                onClick={() => openEdit("marca", m.id, m.nombre, undefined, m.tipo_equipo_ids ?? [])}
+                                title="Editar nombre y tipos de equipo asociados"
+                              >
                                 <Pencil className="h-4 w-4" />
                               </Button>
                               <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={() => handleToggleActivo("marca", m.id, activo)} title={activo === 1 ? "Desactivar" : "Activar"}>
@@ -405,7 +478,7 @@ export function AdminCatalogosContent() {
                     })}
                     {marcas.length === 0 && (
                       <TableRow>
-                        <TableCell colSpan={4} className="text-muted-foreground text-center">No hay marcas</TableCell>
+                        <TableCell colSpan={5} className="text-muted-foreground text-center">No hay marcas</TableCell>
                       </TableRow>
                     )}
                   </TableBody>
@@ -435,7 +508,7 @@ export function AdminCatalogosContent() {
                 </div>
                 <Input
                   placeholder="Nombre del modelo"
-                  value={activeTab === "modelos" ? newNombre : ""}
+                    value={activeTab === "modelos" ? newNombre : ""}
                   onChange={(e) => setNewNombre(e.target.value)}
                   className="max-w-[180px]"
                 />
@@ -463,7 +536,7 @@ export function AdminCatalogosContent() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {modelos.map((mo) => {
+                    {modelos.filter((mo) => mo.nombre.toLowerCase().includes(searchText.toLowerCase())).map((mo) => {
                       const activo = mo.activo ?? 1
                       return (
                         <TableRow key={mo.id} className={activo === 0 ? "opacity-60" : ""}>
@@ -530,7 +603,7 @@ export function AdminCatalogosContent() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {arrendadores.map((a) => {
+                    {arrendadores.filter((a) => a.nombre.toLowerCase().includes(searchText.toLowerCase())).map((a) => {
                       const activo = a.activo ?? 1
                       return (
                         <TableRow key={a.id} className={activo === 0 ? "opacity-60" : ""}>
@@ -567,7 +640,9 @@ export function AdminCatalogosContent() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
-              Editar {editKind === "tipo" ? "tipo de equipo" : editKind === "marca" ? "marca" : editKind === "modelo" ? "modelo" : "arrendador"}
+              {editKind === "marca"
+                ? "Editar marca y tipos de equipo"
+                : `Editar ${editKind === "tipo" ? "tipo de equipo" : editKind === "modelo" ? "modelo" : "arrendador"}`}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
@@ -593,6 +668,40 @@ export function AdminCatalogosContent() {
                     <option key={m.id} value={m.id}>{m.nombre}</option>
                   ))}
                 </select>
+              </div>
+            )}
+            {editKind === "marca" && (
+              <div className="space-y-2">
+                <Label>Tipos de equipo (relación marca ↔ tipo)</Label>
+                <p className="text-xs text-muted-foreground">
+                  Elige los tipos en los que esta marca debe aparecer al registrar equipos.
+                </p>
+                <Select
+                  value=""
+                  onValueChange={(value) => {
+                    setEditMarcaTipos((prev) => (prev.includes(value) ? prev.filter((x) => x !== value) : [...prev, value]))
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue
+                      placeholder={
+                        editMarcaTipos.length === 0
+                          ? "Elegir al menos un tipo"
+                          : `${editMarcaTipos.length} tipo(s) seleccionado(s)`
+                      }
+                    />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {tipos.map((t) => (
+                      <SelectItem key={t.id} value={t.id}>
+                        {editMarcaTipos.includes(t.id) ? `✓ ${t.nombre}` : t.nombre}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Seleccionados: {editMarcaTipos.map((id) => tiposMap[id] ?? id).join(", ") || "ninguno"}
+                </p>
               </div>
             )}
           </div>

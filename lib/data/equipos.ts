@@ -6,6 +6,15 @@ import { buildEquipoCompositeId as buildEquipoCompositeIdImpl, parseEquipoId as 
 import { timed, withTimeout, getEmpresaQueryTimeoutMs } from "./timing"
 import { getCachedIf } from "./cache"
 
+export class EquipoValidationError extends Error {
+  field: string
+  constructor(field: string, message: string) {
+    super(message)
+    this.name = "EquipoValidationError"
+    this.field = field
+  }
+}
+
 type EquipoRow = {
   id: number
   sucursal_id: number
@@ -26,6 +35,80 @@ type EquipoRow = {
   notas: string | null
   created_at: unknown
   updated_at: unknown
+}
+
+type EquipoInput = {
+  color_center_id: number
+  tipo_equipo?: Equipo["tipo_equipo"]
+  tipo_equipo_id?: number | null
+  marca?: string | null
+  marca_id?: number | null
+  modelo?: string | null
+  modelo_id?: number | null
+  numero_serie?: string | null
+  fecha_compra?: string | null
+  tipo_propiedad: Equipo["tipo_propiedad"]
+  arrendador?: string | null
+  arrendador_id?: number | null
+  fecha_vencimiento_arrendamiento?: string | null
+  estado: Equipo["estado"]
+  ultima_calibracion?: string | null
+  proxima_revision?: string | null
+  notas?: string | null
+  equipo_ups_id?: number | null
+  equipo_regulador_id?: number | null
+  equipo_impresora_id?: number | null
+}
+
+async function resolveTipoId(pool: Pool, data: { tipo_equipo?: string; tipo_equipo_id?: number | null }): Promise<number> {
+  if (typeof data.tipo_equipo_id === "number" && data.tipo_equipo_id > 0) return data.tipo_equipo_id
+  if (data.tipo_equipo) {
+    const [r] = await pool.query<{ id: number }[]>("SELECT id FROM cat_tipos_equipo WHERE nombre = ?", [data.tipo_equipo])
+    const tid = Array.isArray(r) && r[0] ? r[0].id : null
+    if (tid != null) return tid
+  }
+  throw new EquipoValidationError("tipo_equipo_id", "Tipo de equipo no encontrado")
+}
+
+async function resolveMarcaId(pool: Pool, data: { marca?: string | null; marca_id?: number | null }): Promise<number> {
+  if (typeof data.marca_id === "number" && data.marca_id > 0) return data.marca_id
+  if (data.marca) {
+    const [r] = await pool.query<{ id: number }[]>("SELECT id FROM marcas_equipo WHERE nombre = ?", [data.marca])
+    const mid = Array.isArray(r) && r[0] ? r[0].id : null
+    if (mid != null) return mid
+  }
+  throw new EquipoValidationError("marca_id", "Marca no encontrada")
+}
+
+async function resolveModeloId(pool: Pool, data: { modelo?: string | null; modelo_id?: number | null; marca_id: number }): Promise<number> {
+  if (typeof data.modelo_id === "number" && data.modelo_id > 0) {
+    const [r] = await pool.query<{ id: number }[]>(
+      "SELECT id FROM modelos_equipo WHERE id = ? AND marca_id = ?",
+      [data.modelo_id, data.marca_id]
+    )
+    const found = Array.isArray(r) && r[0] ? r[0].id : null
+    if (found != null) return found
+    throw new EquipoValidationError("modelo_id", "El modelo no pertenece a la marca seleccionada")
+  }
+  if (data.modelo) {
+    const [r] = await pool.query<{ id: number }[]>(
+      "SELECT id FROM modelos_equipo WHERE nombre = ? AND marca_id = ?",
+      [data.modelo, data.marca_id]
+    )
+    const found = Array.isArray(r) && r[0] ? r[0].id : null
+    if (found != null) return found
+  }
+  throw new EquipoValidationError("modelo_id", "Modelo no encontrado para la marca seleccionada")
+}
+
+async function ensureMarcaTipo(pool: Pool, marcaId: number, tipoEquipoId: number): Promise<void> {
+  const [r] = await pool.query<{ ok: number }[]>(
+    "SELECT 1 AS ok FROM marca_tipo_equipo WHERE marca_id = ? AND tipo_equipo_id = ? AND activo = 1 LIMIT 1",
+    [marcaId, tipoEquipoId]
+  )
+  if (!(Array.isArray(r) && r[0])) {
+    throw new EquipoValidationError("marca_id", "La marca no está habilitada para el tipo de equipo seleccionado")
+  }
 }
 
 function mapEquipoRow(row: EquipoRow): Equipo {
@@ -171,7 +254,11 @@ export async function findEquipoInAllBases(
 export async function actualizarEquipo(
   pool: Pool,
   equipoId: string,
-  data: Partial<Omit<Equipo, "id" | "created_at">>
+  data: Partial<Omit<EquipoInput, "color_center_id" | "tipo_propiedad" | "estado">> & {
+    color_center_id?: number | string
+    tipo_propiedad?: Equipo["tipo_propiedad"]
+    estado?: Equipo["estado"]
+  }
 ): Promise<Equipo> {
   const equipo = await getEquipoById(pool, equipoId)
   if (!equipo) throw new Error("Equipo no encontrado")
@@ -212,13 +299,14 @@ export async function actualizarEquipo(
     values.push(data.foto_url || null)
   }
 
-  if (data.tipo_equipo !== undefined) {
-    const [r] = await pool.query<{ id: number }[]>("SELECT id FROM cat_tipos_equipo WHERE nombre = ?", [data.tipo_equipo])
-    const tid = Array.isArray(r) && r[0] ? r[0].id : null
-    if (tid != null) {
-      updates.push("tipo_equipo_id = ?")
-      values.push(tid)
-    }
+  let nextTipoId: number | null = null
+  if (data.tipo_equipo !== undefined || data.tipo_equipo_id !== undefined) {
+    nextTipoId = await resolveTipoId(pool, {
+      tipo_equipo: data.tipo_equipo,
+      tipo_equipo_id: data.tipo_equipo_id ?? null,
+    })
+    updates.push("tipo_equipo_id = ?")
+    values.push(nextTipoId)
   }
   if (data.estado !== undefined) {
     const [r] = await pool.query<{ id: number }[]>("SELECT id FROM cat_estados_equipo WHERE nombre = ?", [data.estado])
@@ -236,28 +324,30 @@ export async function actualizarEquipo(
       values.push(pid)
     }
   }
-  if (data.marca !== undefined) {
-    if (data.marca) {
-      const [r] = await pool.query<{ id: number }[]>("SELECT id FROM marcas_equipo WHERE nombre = ?", [data.marca])
-      const mid = Array.isArray(r) && r[0] ? r[0].id : null
-      updates.push("marca_id = ?")
-      values.push(mid)
-    } else {
-      updates.push("marca_id = NULL")
-    }
-  }
-  if (data.modelo !== undefined) {
-    if (data.modelo && data.marca) {
-      const [r] = await pool.query<{ id: number }[]>(
-        "SELECT mo.id FROM modelos_equipo mo JOIN marcas_equipo m ON m.id = mo.marca_id WHERE mo.nombre = ? AND m.nombre = ?",
-        [data.modelo, data.marca]
-      )
-      const mid = Array.isArray(r) && r[0] ? r[0].id : null
-      updates.push("modelo_id = ?")
-      values.push(mid)
-    } else {
+  let nextMarcaId: number | null = null
+  if (data.marca !== undefined || data.marca_id !== undefined) {
+    nextMarcaId = await resolveMarcaId(pool, { marca: data.marca ?? null, marca_id: data.marca_id ?? null })
+    const tipoForMarca = nextTipoId ?? (
+      await resolveTipoId(pool, { tipo_equipo: equipo.tipo_equipo, tipo_equipo_id: null })
+    )
+    await ensureMarcaTipo(pool, nextMarcaId, tipoForMarca)
+    updates.push("marca_id = ?")
+    values.push(nextMarcaId)
+    if (data.modelo === undefined && data.modelo_id === undefined) {
       updates.push("modelo_id = NULL")
     }
+  }
+  if (data.modelo !== undefined || data.modelo_id !== undefined) {
+    const markaId = nextMarcaId ?? (
+      await resolveMarcaId(pool, { marca: equipo.marca, marca_id: null })
+    )
+    const modeloId = await resolveModeloId(pool, {
+      modelo: data.modelo ?? null,
+      modelo_id: data.modelo_id ?? null,
+      marca_id: markaId,
+    })
+    updates.push("modelo_id = ?")
+    values.push(modeloId)
   }
   if (data.arrendador !== undefined) {
     if (data.arrendador) {
@@ -268,6 +358,18 @@ export async function actualizarEquipo(
     } else {
       updates.push("arrendador_id = NULL")
     }
+  }
+  if (data.equipo_ups_id !== undefined) {
+    updates.push("equipo_ups_id = ?")
+    values.push(data.equipo_ups_id || null)
+  }
+  if (data.equipo_regulador_id !== undefined) {
+    updates.push("equipo_regulador_id = ?")
+    values.push(data.equipo_regulador_id || null)
+  }
+  if (data.equipo_impresora_id !== undefined) {
+    updates.push("equipo_impresora_id = ?")
+    values.push(data.equipo_impresora_id || null)
   }
 
   if (updates.length === 0) return equipo
@@ -280,25 +382,12 @@ export async function actualizarEquipo(
 /** Crea un equipo en la base. Requiere sucursal_id (numérico), tipo_equipo, tipo_propiedad, estado. */
 export async function crearEquipo(
   pool: Pool,
-  data: {
-    color_center_id: number
-    tipo_equipo: Equipo["tipo_equipo"]
-    marca?: string | null
-    modelo?: string | null
-    numero_serie?: string | null
-    fecha_compra?: string | null
-    tipo_propiedad: Equipo["tipo_propiedad"]
-    arrendador?: string | null
-    fecha_vencimiento_arrendamiento?: string | null
-    estado: Equipo["estado"]
-    ultima_calibracion?: string | null
-    proxima_revision?: string | null
-    notas?: string | null
-  }
+  data: EquipoInput
 ): Promise<Equipo> {
-  const [tr] = await pool.query<{ id: number }[]>("SELECT id FROM cat_tipos_equipo WHERE nombre = ?", [data.tipo_equipo])
-  const tipo_equipo_id = Array.isArray(tr) && tr[0] ? tr[0].id : null
-  if (tipo_equipo_id == null) throw new Error("Tipo de equipo no encontrado")
+  const tipo_equipo_id = await resolveTipoId(pool, {
+    tipo_equipo: data.tipo_equipo,
+    tipo_equipo_id: data.tipo_equipo_id ?? null,
+  })
 
   const [er] = await pool.query<{ id: number }[]>("SELECT id FROM cat_estados_equipo WHERE nombre = ?", [data.estado])
   const estado_id = Array.isArray(er) && er[0] ? er[0].id : null
@@ -308,20 +397,13 @@ export async function crearEquipo(
   const tipo_propiedad_id = Array.isArray(pr) && pr[0] ? pr[0].id : null
   if (tipo_propiedad_id == null) throw new Error("Tipo de propiedad no encontrado")
 
-  let marca_id: number | null = null
-  if (data.marca) {
-    const [mr] = await pool.query<{ id: number }[]>("SELECT id FROM marcas_equipo WHERE nombre = ?", [data.marca])
-    marca_id = Array.isArray(mr) && mr[0] ? mr[0].id : null
-  }
-
-  let modelo_id: number | null = null
-  if (data.modelo && data.marca) {
-    const [mor] = await pool.query<{ id: number }[]>(
-      "SELECT mo.id FROM modelos_equipo mo JOIN marcas_equipo m ON m.id = mo.marca_id WHERE mo.nombre = ? AND m.nombre = ?",
-      [data.modelo, data.marca]
-    )
-    modelo_id = Array.isArray(mor) && mor[0] ? mor[0].id : null
-  }
+  const marca_id = await resolveMarcaId(pool, { marca: data.marca ?? null, marca_id: data.marca_id ?? null })
+  await ensureMarcaTipo(pool, marca_id, tipo_equipo_id)
+  const modelo_id = await resolveModeloId(pool, {
+    modelo: data.modelo ?? null,
+    modelo_id: data.modelo_id ?? null,
+    marca_id,
+  })
 
   let arrendador_id: number | null = null
   if (data.arrendador) {
@@ -333,8 +415,8 @@ export async function crearEquipo(
     `INSERT INTO equipos (
       sucursal_id, tipo_equipo_id, marca_id, modelo_id, numero_serie, fecha_compra,
       tipo_propiedad_id, arrendador_id, fecha_vencimiento_arrendamiento, estado_id,
-      ultima_calibracion, proxima_revision, notas
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ultima_calibracion, proxima_revision, notas, equipo_ups_id, equipo_regulador_id, equipo_impresora_id
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       Number(data.color_center_id),
       tipo_equipo_id,
@@ -349,6 +431,9 @@ export async function crearEquipo(
       data.ultima_calibracion || null,
       data.proxima_revision || null,
       data.notas ?? null,
+      data.equipo_ups_id ?? null,
+      data.equipo_regulador_id ?? null,
+      data.equipo_impresora_id ?? null,
     ]
   )
   const insertId = (result as unknown as { insertId: number }).insertId

@@ -137,6 +137,20 @@ CREATE TABLE marcas_equipo (
 -- Tu nota: Esta correcto
 -- Opinión (IA): OK.
 
+-- Relación marcas ↔ tipos de equipo (una marca puede existir en múltiples tipos)
+CREATE TABLE marca_tipo_equipo (
+  id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  marca_id INT NOT NULL,
+  tipo_equipo_id INT NOT NULL,
+  activo TINYINT(1) NOT NULL DEFAULT 1,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uk_marca_tipo (marca_id, tipo_equipo_id),
+  CONSTRAINT fk_marca_tipo_marca FOREIGN KEY (marca_id) REFERENCES marcas_equipo(id) ON DELETE CASCADE,
+  CONSTRAINT fk_marca_tipo_tipo FOREIGN KEY (tipo_equipo_id) REFERENCES cat_tipos_equipo(id) ON DELETE CASCADE
+);
+CREATE INDEX idx_marca_tipo_marca ON marca_tipo_equipo(marca_id);
+CREATE INDEX idx_marca_tipo_tipo ON marca_tipo_equipo(tipo_equipo_id);
+
 -- Modelos de equipo (pertenecen a una marca)
 CREATE TABLE modelos_equipo (
   id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
@@ -267,6 +281,9 @@ CREATE TABLE equipos (
   tipo_equipo_id INT NOT NULL,
   marca_id INT DEFAULT NULL,
   modelo_id INT DEFAULT NULL,
+  equipo_ups_id INT DEFAULT NULL COMMENT 'Equipo UPS asociado',
+  equipo_regulador_id INT DEFAULT NULL COMMENT 'Equipo regulador asociado',
+  equipo_impresora_id INT DEFAULT NULL COMMENT 'Equipo impresora asociado',
   numero_serie VARCHAR(100) DEFAULT NULL,
   fecha_compra DATE DEFAULT NULL,
   tipo_propiedad_id INT NOT NULL,
@@ -284,6 +301,9 @@ CREATE TABLE equipos (
   CONSTRAINT fk_equipos_tipo FOREIGN KEY (tipo_equipo_id) REFERENCES cat_tipos_equipo(id),
   CONSTRAINT fk_equipos_marca FOREIGN KEY (marca_id) REFERENCES marcas_equipo(id) ON DELETE SET NULL,
   CONSTRAINT fk_equipos_modelo FOREIGN KEY (modelo_id) REFERENCES modelos_equipo(id) ON DELETE SET NULL,
+  CONSTRAINT fk_equipos_ups FOREIGN KEY (equipo_ups_id) REFERENCES equipos(id) ON DELETE SET NULL,
+  CONSTRAINT fk_equipos_regulador FOREIGN KEY (equipo_regulador_id) REFERENCES equipos(id) ON DELETE SET NULL,
+  CONSTRAINT fk_equipos_impresora FOREIGN KEY (equipo_impresora_id) REFERENCES equipos(id) ON DELETE SET NULL,
   CONSTRAINT fk_equipos_propiedad FOREIGN KEY (tipo_propiedad_id) REFERENCES cat_tipos_propiedad(id),
   CONSTRAINT fk_equipos_arrendador FOREIGN KEY (arrendador_id) REFERENCES arrendadores(id) ON DELETE SET NULL,
   CONSTRAINT fk_equipos_estado FOREIGN KEY (estado_id) REFERENCES cat_estados_equipo(id)
@@ -294,6 +314,9 @@ CREATE INDEX idx_equipos_estado ON equipos(estado_id);
 CREATE INDEX idx_equipos_marca ON equipos(marca_id);
 CREATE INDEX idx_equipos_modelo ON equipos(modelo_id);
 CREATE INDEX idx_equipos_arrendador ON equipos(arrendador_id);
+CREATE INDEX idx_equipos_ups ON equipos(equipo_ups_id);
+CREATE INDEX idx_equipos_regulador ON equipos(equipo_regulador_id);
+CREATE INDEX idx_equipos_impresora ON equipos(equipo_impresora_id);
 -- Tu nota: Esta correcto pero no sirve codigoqr, foto ahi? va en otra tabla las fotos? Documento?
 -- Opinión (IA): codigo_qr / foto_url / documentos_url son atajos o legacy. Fotos actuales: tabla equipo_fotos + Supabase.
 --   documentos_url: un solo enlace; varios archivos implicarían otra tabla.

@@ -12,7 +12,11 @@ async function getOtrasEmpresasParaSync(): Promise<EmpresaId[]> {
 }
 
 /** Replica una marca al resto de las bases (mismo id). Idempotente: ON DUPLICATE KEY UPDATE. */
-export async function syncMarcaToOtrasBases(id: number, nombre: string): Promise<void> {
+export async function syncMarcaToOtrasBases(
+  id: number,
+  nombre: string,
+  tipoEquipoIds: number[] = []
+): Promise<void> {
   const otras = await getOtrasEmpresasParaSync()
   for (const empresaId of otras) {
     const pool = await getPool(empresaId)
@@ -20,6 +24,13 @@ export async function syncMarcaToOtrasBases(id: number, nombre: string): Promise
       "INSERT INTO marcas_equipo (id, nombre, activo) VALUES (?, ?, 1) ON DUPLICATE KEY UPDATE nombre = VALUES(nombre), activo = VALUES(activo)",
       [id, nombre]
     )
+    await pool.query("DELETE FROM marca_tipo_equipo WHERE marca_id = ?", [id])
+    for (const tipoEquipoId of tipoEquipoIds) {
+      await pool.query(
+        "INSERT INTO marca_tipo_equipo (marca_id, tipo_equipo_id, activo) VALUES (?, ?, 1) ON DUPLICATE KEY UPDATE activo = VALUES(activo)",
+        [id, tipoEquipoId]
+      )
+    }
   }
 }
 
@@ -67,7 +78,8 @@ export async function syncCatTipoEquipoToOtrasBases(id: number, nombre: string):
 export async function updateMarcaInOtrasBases(
   id: number,
   nombre: string,
-  activo: number
+  activo: number,
+  tipoEquipoIds: number[] = []
 ): Promise<void> {
   const otras = await getOtrasEmpresasParaSync()
   for (const empresaId of otras) {
@@ -77,6 +89,13 @@ export async function updateMarcaInOtrasBases(
       activo,
       id,
     ])
+    await pool.query("DELETE FROM marca_tipo_equipo WHERE marca_id = ?", [id])
+    for (const tipoEquipoId of tipoEquipoIds) {
+      await pool.query(
+        "INSERT INTO marca_tipo_equipo (marca_id, tipo_equipo_id, activo) VALUES (?, ?, 1) ON DUPLICATE KEY UPDATE activo = VALUES(activo)",
+        [id, tipoEquipoId]
+      )
+    }
   }
 }
 

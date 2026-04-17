@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useLayoutEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -14,17 +14,22 @@ import { cn } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
 
 export interface TableColumnFilterProps<T extends string> {
-  /** Etiqueta de la columna */
   label: string
-  /** Valores únicos que aparecen en la columna (opciones del filtro) */
   options: { value: T; label: string }[]
-  /** Valores actualmente seleccionados (null = todos). Si el set está vacío, se muestran 0 filas. */
+  /** Valor aplicado: null = sin filtro (todos). Set parcial = solo esos. */
   selected: Set<T> | null
   onSelectedChange: (selected: Set<T> | null) => void
-  /** Placeholder del buscador dentro del popover */
   searchPlaceholder?: string
-  /** Clase para el trigger (icono) */
   triggerClassName?: string
+}
+
+function normalizeCommit<T extends string>(
+  draft: Set<T> | null,
+  allValues: T[]
+): Set<T> | null {
+  if (draft === null) return null
+  if (draft.size === 0 || draft.size === allValues.length) return null
+  return new Set(draft)
 }
 
 export function TableColumnFilter<T extends string>({
@@ -37,6 +42,16 @@ export function TableColumnFilter<T extends string>({
 }: TableColumnFilterProps<T>) {
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState("")
+  /** Borrador: null = todos marcados; Set vacío = ninguno marcado (al aplicar → sin filtro / ver todo). */
+  const [draft, setDraft] = useState<Set<T> | null>(null)
+
+  const allValues = useMemo(() => options.map((o) => o.value), [options])
+
+  useLayoutEffect(() => {
+    if (!open) return
+    setDraft(selected === null ? null : new Set(selected))
+    setSearch("")
+  }, [open, selected])
 
   const filteredOptions = useMemo(() => {
     if (!search.trim()) return options
@@ -46,31 +61,58 @@ export function TableColumnFilter<T extends string>({
     )
   }, [options, search])
 
-  const allSelected = selected === null || selected.size === options.length
-  const active = selected !== null && selected.size > 0 && selected.size < options.length
+  const draftAllSelected =
+    draft === null || (draft !== null && draft.size === options.length)
+  const draftPartial =
+    draft !== null && draft.size > 0 && draft.size < options.length
+
+  const active =
+    selected !== null &&
+    selected.size > 0 &&
+    selected.size < options.length
   const selectedLabels = useMemo(
-    () => (selected ? options.filter((o) => selected.has(o.value)).map((o) => o.label) : []),
+    () =>
+      selected
+        ? options.filter((o) => selected.has(o.value)).map((o) => o.label)
+        : [],
     [options, selected]
   )
 
   const handleToggleAll = (checked: boolean) => {
-    if (checked) {
-      onSelectedChange(null)
-    } else {
-      onSelectedChange(new Set())
-    }
+    if (checked) setDraft(null)
+    else setDraft(new Set())
   }
 
   const handleToggleOne = (value: T, checked: boolean) => {
-    const next = new Set(selected ?? options.map((o) => o.value))
-    if (checked) next.add(value)
-    else next.delete(value)
-    if (next.size === 0) onSelectedChange(new Set())
-    else if (next.size === options.length) onSelectedChange(null)
-    else onSelectedChange(next)
+    const base =
+      draft === null ? (new Set(allValues) as Set<T>) : new Set(draft)
+    if (checked) base.add(value)
+    else base.delete(value)
+    if (base.size === 0) setDraft(new Set())
+    else if (base.size === options.length) setDraft(null)
+    else setDraft(base)
   }
 
-  const isChecked = (value: T) => selected === null || selected.has(value)
+  const isChecked = (value: T) =>
+    draft === null || (draft !== null && draft.has(value))
+
+  const applyDraft = () => {
+    if (draft === null) {
+      onSelectedChange(null)
+    } else {
+      onSelectedChange(normalizeCommit(draft, allValues))
+    }
+    setOpen(false)
+  }
+
+  const cancelDraft = () => {
+    setOpen(false)
+  }
+
+  const clearFilterNow = () => {
+    onSelectedChange(null)
+    setOpen(false)
+  }
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -106,7 +148,10 @@ export function TableColumnFilter<T extends string>({
                   e.stopPropagation()
                   onSelectedChange(null)
                 }}
-                onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), onSelectedChange(null))}
+                onKeyDown={(e) =>
+                  e.key === "Enter" &&
+                  (e.preventDefault(), onSelectedChange(null))
+                }
                 aria-label="Quitar filtro"
               >
                 <X className="h-3 w-3" />
@@ -124,45 +169,66 @@ export function TableColumnFilter<T extends string>({
             className="h-8"
           />
         </div>
-        <div className="max-h-[280px] overflow-y-auto p-2">
-          <div className="flex items-center gap-2 py-1.5 px-2 rounded hover:bg-muted/50">
-            <Checkbox
-              checked={allSelected}
-              onCheckedChange={(c) => handleToggleAll(!!c)}
-            />
-            <span className="text-sm font-medium">Todos ({options.length})</span>
-          </div>
-          {filteredOptions.map((opt) => (
-            <div
-              key={String(opt.value)}
-              className="flex items-center gap-2 py-1.5 px-2 rounded hover:bg-muted/50"
-            >
-              <Checkbox
-                checked={isChecked(opt.value)}
-                onCheckedChange={(c) => handleToggleOne(opt.value, !!c)}
-              />
-              <span className="text-sm truncate">{opt.label}</span>
-            </div>
-          ))}
-          {filteredOptions.length === 0 && (
-            <p className="text-sm text-muted-foreground py-2">Sin coincidencias</p>
+        <div className="max-h-[240px] overflow-y-auto p-2">
+          {open && (
+            <>
+              <div className="flex items-center gap-2 py-1.5 px-2 rounded hover:bg-muted/50">
+                <Checkbox
+                  checked={
+                    draftAllSelected ? true : draftPartial ? "indeterminate" : false
+                  }
+                  onCheckedChange={(c) => handleToggleAll(!!c)}
+                />
+                <span className="text-sm font-medium">Todos ({options.length})</span>
+              </div>
+              {filteredOptions.map((opt) => (
+                <div
+                  key={String(opt.value)}
+                  className="flex items-center gap-2 py-1.5 px-2 rounded hover:bg-muted/50"
+                >
+                  <Checkbox
+                    checked={isChecked(opt.value)}
+                    onCheckedChange={(c) => handleToggleOne(opt.value, !!c)}
+                  />
+                  <span className="text-sm truncate">{opt.label}</span>
+                </div>
+              ))}
+              {filteredOptions.length === 0 && (
+                <p className="text-sm text-muted-foreground py-2">Sin coincidencias</p>
+              )}
+            </>
           )}
         </div>
-        {active && (
-          <div className="p-2 border-t">
+        <div className="p-2 border-t flex flex-col gap-2">
+          <div className="flex gap-2 justify-end">
             <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="flex-1"
+              onClick={cancelDraft}
+            >
+              Cancelar
+            </Button>
+            <Button type="button" size="sm" className="flex-1" onClick={applyDraft}>
+              Aplicar
+            </Button>
+          </div>
+          <p className="text-[11px] text-muted-foreground text-center px-1">
+            Aplicar confirma los cambios; Cancelar cierra sin cambiar el filtro activo.
+          </p>
+          {active && (
+            <Button
+              type="button"
               variant="ghost"
               size="sm"
               className="w-full h-8 text-muted-foreground"
-              onClick={() => {
-                onSelectedChange(null)
-                setOpen(false)
-              }}
+              onClick={clearFilterNow}
             >
-              Limpiar filtro
+              Quitar filtro (mostrar todo)
             </Button>
-          </div>
-        )}
+          )}
+        </div>
       </PopoverContent>
     </Popover>
   )
