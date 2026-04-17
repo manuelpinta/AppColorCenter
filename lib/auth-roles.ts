@@ -50,6 +50,19 @@ export async function userCanWrite(): Promise<boolean> {
   return roles.includes("soporte") || roles.includes("soporte-central")
 }
 
+export async function userCanEditNormatividadFields(): Promise<boolean> {
+  const roles = await getUserRoles()
+  return roles.includes("normatividad")
+}
+
+export async function userCanUpdateEquipos(): Promise<boolean> {
+  const [canWrite, canEditNormatividad] = await Promise.all([
+    userCanWrite(),
+    userCanEditNormatividadFields(),
+  ])
+  return canWrite || canEditNormatividad
+}
+
 export async function userCanRead(): Promise<boolean> {
   const session = await auth0.getSession()
   return Boolean(session?.user)
@@ -73,5 +86,11 @@ export async function requireWrite(redirectTo: string = "/"): Promise<void> {
   }
 
   redirect(`/sin-rol?reason=insufficient_write&redirectTo=${encodeURIComponent(redirectTo)}`)
+}
+
+export async function requireUpdateEquipos(redirectTo: string = "/"): Promise<void> {
+  const canUpdate = await userCanUpdateEquipos()
+  if (canUpdate) return
+  await requireWrite(redirectTo)
 }
 

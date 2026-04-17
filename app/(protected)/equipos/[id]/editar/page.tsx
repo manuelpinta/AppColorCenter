@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation"
 import Link from "next/link"
-import { requireWrite } from "@/lib/auth-roles"
+import { requireUpdateEquipos, userCanEditNormatividadFields, userCanWrite } from "@/lib/auth-roles"
 import { EquipoForm } from "@/components/equipo-form"
 import {
   findEquipoInAllBases,
@@ -12,7 +12,7 @@ import { ArrowLeft } from "lucide-react"
 import { getEmpresasForCurrentUser } from "@/lib/data/empresas-auth"
 
 export default async function EditarEquipoPage({ params }: { params: Promise<{ id: string }> }) {
-  await requireWrite("/equipos")
+  await requireUpdateEquipos("/equipos")
   const { id } = await params
 
   const found = await findEquipoInAllBases(id)
@@ -20,12 +20,14 @@ export default async function EditarEquipoPage({ params }: { params: Promise<{ i
   const { equipo, pool, empresaId } = found
 
   const { numericId } = parseEquipoId(id)
-  const [empresas, colorCenters, computadoraInicial] = await Promise.all([
+  const [empresas, colorCenters, computadoraInicial, canEditNormatividadFields, canWrite] = await Promise.all([
     getEmpresasForCurrentUser(),
     getSucursalesByEmpresa(empresaId),
     equipo.tipo_equipo === "Equipo de Computo"
       ? getComputadoraByEquipoId(pool, numericId)
       : Promise.resolve(null),
+    userCanEditNormatividadFields(),
+    userCanWrite(),
   ])
 
   return (
@@ -53,6 +55,7 @@ export default async function EditarEquipoPage({ params }: { params: Promise<{ i
           computadoraInicial={computadoraInicial}
           empresaId={empresaId}
           equipoIdForLink={id}
+          normatividadMode={canEditNormatividadFields && !canWrite}
         />
       </div>
     </div>
