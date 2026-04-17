@@ -14,12 +14,22 @@ export async function GET(request: NextRequest) {
     }
     const pool = await getPool(empresaId)
     const marcaId = searchParams.get("marca_id")
+    const tipoEquipoId = searchParams.get("tipo_equipo_id")
     const incluirInactivos = searchParams.get("incluir_inactivos") === "1"
-    const items = incluirInactivos
+    let items = incluirInactivos
       ? await getModelosAllParaAdmin(pool)
       : marcaId
         ? await getModelosByMarca(pool, marcaId)
         : await getModelosAll(pool)
+    if (tipoEquipoId) {
+      const tipoStr = String(tipoEquipoId)
+      const [filtered] = await pool.query<{ id: number }[]>(
+        "SELECT marca_id AS id FROM marca_tipo_equipo WHERE tipo_equipo_id = ? AND activo = 1",
+        [tipoStr]
+      )
+      const allowed = new Set((Array.isArray(filtered) ? filtered : []).map((x) => String(x.id)))
+      items = items.filter((item) => allowed.has(String(item.marca_id)))
+    }
     return NextResponse.json(items)
   } catch (err) {
     console.error("GET /api/catalogos/modelos", err)

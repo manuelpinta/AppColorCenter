@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getPool, getCatalogoMaestroEmpresaId, getEmpresaIdForCatalogRead, isEmpresaAllowedForRequest } from "@/lib/db"
-import { getMarcasEquipo, getMarcasEquipoParaAdmin, crearMarca } from "@/lib/data/catalogos"
+import { getMarcasEquipo, getMarcasEquipoByTipo, getMarcasEquipoParaAdmin, crearMarca } from "@/lib/data/catalogos"
 import { syncMarcaToOtrasBases } from "@/lib/data/catalogos-sync"
 import { userHasRole } from "@/lib/auth-roles"
 
@@ -14,9 +14,12 @@ export async function GET(request: NextRequest) {
     }
     const pool = await getPool(empresaId)
     const incluirInactivos = request.nextUrl.searchParams.get("incluir_inactivos") === "1"
+    const tipoEquipoId = request.nextUrl.searchParams.get("tipo_equipo_id")?.trim()
     const items = incluirInactivos
       ? await getMarcasEquipoParaAdmin(pool)
-      : (await getMarcasEquipo(pool)).map((m) => ({ ...m, activo: 1 }))
+      : tipoEquipoId
+        ? (await getMarcasEquipoByTipo(pool, tipoEquipoId)).map((m) => ({ ...m, activo: 1 }))
+        : (await getMarcasEquipo(pool)).map((m) => ({ ...m, activo: 1 }))
     return NextResponse.json(items)
   } catch (err) {
     console.error("GET /api/catalogos/marcas", err)
@@ -32,15 +35,21 @@ export async function POST(request: NextRequest) {
   if (!(await userHasRole("soporte-central"))) {
     return NextResponse.json({ error: "No tienes permisos para gestionar marcas" }, { status: 403 })
   }
-  let body: { nombre?: string }
+  let body: { nombre?: string; tipo_equipo_ids?: unknown }
   try {
     body = await request.json()
   } catch {
     return NextResponse.json({ error: "Cuerpo inválido" }, { status: 400 })
   }
   const nombre = typeof body.nombre === "string" ? body.nombre.trim() : ""
+  const tipoEquipoIds = Array.isArray(body.tipo_equipo_ids)
+    ? body.tipo_equipo_ids.map((x) => String(x))
+    : []
   if (!nombre) {
     return NextResponse.json({ error: "nombre es requerido" }, { status: 400 })
+  }
+  if (tipoEquipoIds.length === 0) {
+    return NextResponse.json({ error: "tipo_equipo_ids es requerido" }, { status: 400 })
   }
 
   try {
@@ -49,8 +58,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "No tienes acceso a esta empresa" }, { status: 403 })
     }
     const pool = await getPool(empresaId)
-    const created = await crearMarca(pool, nombre)
-    await syncMarcaToOtrasBases(Number(created.id), created.nombre)
+    const created = await crearMarca(pool, nombre, tipoEquipoIds)
+    await syncMarcaToOtrasBases(
+      Number(created.id),
+      created.nombre,
+      created.tipo_equipo_ids.map((x) => Number(x))
+    )
     return NextResponse.json(created)
   } catch (err) {
     console.error("POST /api/catalogos/marcas", err)

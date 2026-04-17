@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getPool, isEmpresaAllowedForRequest } from "@/lib/db"
 import { crearEquipo, parseEquipoId, buildEquipoCompositeId, actualizarComputadora } from "@/lib/data"
+import { EquipoValidationError } from "@/lib/data/equipos"
 import type { Equipo } from "@/lib/types"
 import type { EmpresaId } from "@/lib/db"
 import { userCanWrite } from "@/lib/auth-roles"
@@ -8,8 +9,11 @@ import { userCanWrite } from "@/lib/auth-roles"
 const bodyAllowed = [
   "color_center_id",
   "tipo_equipo",
+  "tipo_equipo_id",
   "marca",
+  "marca_id",
   "modelo",
+  "modelo_id",
   "numero_serie",
   "fecha_compra",
   "tipo_propiedad",
@@ -19,6 +23,9 @@ const bodyAllowed = [
   "ultima_calibracion",
   "proxima_revision",
   "notas",
+  "equipo_ups_id",
+  "equipo_regulador_id",
+  "equipo_impresora_id",
 ] as const
 
 export async function POST(request: NextRequest) {
@@ -91,8 +98,11 @@ export async function POST(request: NextRequest) {
     const equipo = await crearEquipo(pool, {
       color_center_id: sucursalIdNum,
       tipo_equipo,
+      tipo_equipo_id: data.tipo_equipo_id != null ? Number(data.tipo_equipo_id) : undefined,
       marca: (data.marca as string | null) ?? null,
+      marca_id: data.marca_id != null ? Number(data.marca_id) : undefined,
       modelo: (data.modelo as string | null) ?? null,
+      modelo_id: data.modelo_id != null ? Number(data.modelo_id) : undefined,
       numero_serie: (data.numero_serie as string | null) ?? null,
       fecha_compra: (data.fecha_compra as string | null) ?? null,
       tipo_propiedad,
@@ -102,6 +112,9 @@ export async function POST(request: NextRequest) {
       ultima_calibracion: (data.ultima_calibracion as string | null) ?? null,
       proxima_revision: (data.proxima_revision as string | null) ?? null,
       notas: (data.notas as string | null) ?? null,
+      equipo_ups_id: data.equipo_ups_id != null ? Number(data.equipo_ups_id) : null,
+      equipo_regulador_id: data.equipo_regulador_id != null ? Number(data.equipo_regulador_id) : null,
+      equipo_impresora_id: data.equipo_impresora_id != null ? Number(data.equipo_impresora_id) : null,
     })
     if (tipo_equipo === "Equipo de Computo" && computadoraPayload && typeof computadoraPayload === "object") {
       const comp = computadoraPayload as Record<string, unknown>
@@ -118,6 +131,9 @@ export async function POST(request: NextRequest) {
     const compositeId = buildEquipoCompositeId(empresaId as EmpresaId, equipo)
     return NextResponse.json({ equipo: { ...equipo, id: compositeId }, empresa_id: empresaId })
   } catch (err) {
+    if (err instanceof EquipoValidationError) {
+      return NextResponse.json({ error: err.message, field: err.field }, { status: 400 })
+    }
     const message = err instanceof Error ? err.message : "Error al crear equipo"
     return NextResponse.json({ error: message }, { status: 400 })
   }

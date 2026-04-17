@@ -11,6 +11,7 @@ export {
   getCatalogoNombres,
   getTiposEquipo,
   getMarcasEquipo,
+  getMarcasEquipoByTipo,
   getModelosByMarca,
   getArrendadores,
   crearMarca,
