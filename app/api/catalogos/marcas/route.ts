@@ -15,10 +15,11 @@ export async function GET(request: NextRequest) {
     const pool = await getPool(empresaId)
     const incluirInactivos = request.nextUrl.searchParams.get("incluir_inactivos") === "1"
     const tipoEquipoId = request.nextUrl.searchParams.get("tipo_equipo_id")?.trim()
+    const tipoEquipoNombre = request.nextUrl.searchParams.get("tipo_equipo")?.trim()
     const items = incluirInactivos
       ? await getMarcasEquipoParaAdmin(pool)
       : tipoEquipoId
-        ? (await getMarcasEquipoByTipo(pool, tipoEquipoId)).map((m) => ({ ...m, activo: 1 }))
+        ? (await getMarcasEquipoByTipo(pool, tipoEquipoId, tipoEquipoNombre || undefined)).map((m) => ({ ...m, activo: 1 }))
         : (await getMarcasEquipo(pool)).map((m) => ({ ...m, activo: 1 }))
     return NextResponse.json(items)
   } catch (err) {

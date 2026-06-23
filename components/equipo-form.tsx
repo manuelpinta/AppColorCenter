@@ -109,6 +109,12 @@ export function EquipoForm({
     initial.numericSucursalId || equipo?.color_center_id || defaultColorCenterId || ""
 
   const [empresaId, setEmpresaId] = useState(empresaIdProp ?? initial.empresa_id)
+
+  useEffect(() => {
+    if (!empresaIdProp && !initial.empresa_id && empresas.length === 1) {
+      setEmpresaId(empresas[0].id)
+    }
+  }, [empresas, empresaIdProp, initial.empresa_id])
   const [zona, setZona] = useState(initial.zona)
 
   const computadoraInicial =
@@ -184,7 +190,11 @@ export function EquipoForm({
     }
     const tipoId = catalogTipos.find((t) => t.nombre === formData.tipo_equipo)?.id
     if (!tipoId) return
-    const q = new URLSearchParams({ empresa_id: empresaId, tipo_equipo_id: tipoId })
+    const q = new URLSearchParams({
+      empresa_id: empresaId,
+      tipo_equipo_id: tipoId,
+      tipo_equipo: formData.tipo_equipo,
+    })
     fetch(`/api/catalogos/marcas?${q}`)
       .then((r) => (r.ok ? r.json() : []))
       .then((marcas) => setCatalogMarcas(Array.isArray(marcas) ? marcas : []))

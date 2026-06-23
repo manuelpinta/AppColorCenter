@@ -29,12 +29,18 @@ export async function getMarcasEquipo(pool: Pool): Promise<{ id: string; nombre:
   return arr.map((r) => ({ id: String(r.id), nombre: r.nombre }))
 }
 
-/** Marcas activas filtradas por tipo de equipo. */
+function mapMarcaRows(rows: { id: number; nombre: string }[]): { id: string; nombre: string }[] {
+  const arr = Array.isArray(rows) ? rows : []
+  return arr.map((r) => ({ id: String(r.id), nombre: r.nombre }))
+}
+
+/** Marcas activas filtradas por tipo de equipo (id y/o nombre del tipo). */
 export async function getMarcasEquipoByTipo(
   pool: Pool,
-  tipoEquipoId: string
+  tipoEquipoId: string,
+  tipoEquipoNombre?: string
 ): Promise<{ id: string; nombre: string }[]> {
-  const [rows] = await pool.query<{ id: number; nombre: string }[]>(
+  const [byIdRows] = await pool.query<{ id: number; nombre: string }[]>(
     `SELECT m.id, m.nombre
      FROM marcas_equipo m
      JOIN marca_tipo_equipo mt ON mt.marca_id = m.id
@@ -42,8 +48,32 @@ export async function getMarcasEquipoByTipo(
      ORDER BY m.nombre`,
     [tipoEquipoId]
   )
-  const arr = Array.isArray(rows) ? rows : []
-  return arr.map((r) => ({ id: String(r.id), nombre: r.nombre }))
+  const byId = mapMarcaRows(byIdRows)
+  if (byId.length > 0) return byId
+
+  if (tipoEquipoNombre) {
+    const [byNombreRows] = await pool.query<{ id: number; nombre: string }[]>(
+      `SELECT m.id, m.nombre
+       FROM marcas_equipo m
+       JOIN marca_tipo_equipo mt ON mt.marca_id = m.id
+       JOIN cat_tipos_equipo te ON te.id = mt.tipo_equipo_id
+       WHERE m.activo = 1 AND mt.activo = 1 AND te.nombre = ?
+       ORDER BY m.nombre`,
+      [tipoEquipoNombre]
+    )
+    const byNombre = mapMarcaRows(byNombreRows)
+    if (byNombre.length > 0) return byNombre
+  }
+
+  const [historicRows] = await pool.query<{ id: number; nombre: string }[]>(
+    `SELECT DISTINCT m.id, m.nombre
+     FROM marcas_equipo m
+     JOIN equipos e ON e.marca_id = m.id
+     WHERE m.activo = 1 AND e.tipo_equipo_id = ?
+     ORDER BY m.nombre`,
+    [tipoEquipoId]
+  )
+  return mapMarcaRows(historicRows)
 }
 
 /** Modelos por marca. */
