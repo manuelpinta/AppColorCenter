@@ -138,6 +138,16 @@ export async function getEmpresaIdsForDataLayer(): Promise<EmpresaId[]> {
 }
 
 /**
+ * Empresas donde buscar un registro por id: si el id trae empresa (emp-2-42), solo esa y solo si está permitida;
+ * si no, todas las permitidas.
+ */
+export async function getEmpresaIdsToSearch(onlyEmpresa?: EmpresaId): Promise<EmpresaId[]> {
+  const allowed = await getEmpresaIdsForDataLayer()
+  if (!onlyEmpresa) return allowed
+  return allowed.includes(onlyEmpresa) ? [onlyEmpresa] : []
+}
+
+/**
  * Comprueba si la empresa está permitida para el usuario actual (Auth0 orgs o todas si no aplica).
  * Usar en rutas API y Server Actions antes de getPool(empresaId).
  */

@@ -1,10 +1,17 @@
 /**
  * Cache en memoria para listados "all bases" (sucursales, equipos).
  * Evita repetir las N consultas por empresa al navegar entre Equipos / Sucursales / Dashboard.
+ * La cache es del proceso (compartida entre usuarios): la llave debe incluir las empresas
+ * permitidas del request para que un usuario nunca reciba datos de empresas ajenas.
  */
 const TTL_MS = Number(process.env.ALL_BASES_CACHE_TTL_MS) || 60_000
 
 const store = new Map<string, { data: unknown; expires: number }>()
+
+/** Llave de cache para un listado limitado a un conjunto de empresas. */
+export function cacheKeyForEmpresas(baseKey: string, empresaIds: readonly string[]): string {
+  return `${baseKey}:${[...empresaIds].sort().join(",")}`
+}
 
 export async function getCached<T>(key: string, fn: () => Promise<T>): Promise<T> {
   const now = Date.now()
@@ -28,7 +35,9 @@ export async function getCachedIf<T>(
   return data
 }
 
-/** Invalida una entrada (p. ej. tras crear/editar un registro que alimenta un listado cacheado). */
-export function invalidateCachedList(key: string) {
-  store.delete(key)
+/** Invalida un listado (todas sus variantes por empresas), p. ej. tras crear/editar un registro. */
+export function invalidateCachedList(baseKey: string) {
+  for (const key of store.keys()) {
+    if (key === baseKey || key.startsWith(`${baseKey}:`)) store.delete(key)
+  }
 }
