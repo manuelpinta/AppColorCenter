@@ -2,7 +2,7 @@ import { MantenimientosContent } from "@/components/mantenimientos-content"
 import {
   getMantenimientosAllBases,
   getEquiposAllBases,
-  getColorCentersAllBases,
+  getColorCentersConCerradasAllBases,
 } from "@/lib/data"
 import { userCanWrite } from "@/lib/auth-roles"
 
@@ -10,7 +10,7 @@ export default async function MantenimientosPage() {
   const [mantenimientos, equipos, colorCenters] = await Promise.all([
     getMantenimientosAllBases(),
     getEquiposAllBases(),
-    getColorCentersAllBases(),
+    getColorCentersConCerradasAllBases(),
   ])
   const canWrite = await userCanWrite()
   return (

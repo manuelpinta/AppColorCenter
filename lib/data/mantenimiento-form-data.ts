@@ -1,6 +1,6 @@
 import type { ColorCenter } from "@/lib/types"
 import type { EquipoWithEmpresa } from "@/lib/types"
-import type { EmpresaId } from "@/lib/db"
+import { getEmpresaIdsToSearch } from "@/lib/db"
 import { parseEquipoId } from "./ids"
 import {
   getEquiposAllBases,
@@ -25,9 +25,11 @@ export async function getEquiposAndColorCentersForMantenimientoCrear(params: {
   if (equipo_id) {
     const { empresaId } = parseEquipoId(equipo_id)
     if (empresaId) {
+      const [allowed] = await getEmpresaIdsToSearch(empresaId)
+      if (!allowed) return { equipos: [], colorCenters: [] }
       const [equipos, colorCenters] = await Promise.all([
-        getEquiposByEmpresa(empresaId as EmpresaId),
-        getSucursalesByEmpresa(empresaId as EmpresaId),
+        getEquiposByEmpresa(allowed),
+        getSucursalesByEmpresa(allowed),
       ])
       return { equipos, colorCenters }
     }
@@ -35,7 +37,7 @@ export async function getEquiposAndColorCentersForMantenimientoCrear(params: {
 
   if (color_center_id) {
     const resolved = await getSucursalByCompositeId(color_center_id)
-    if (resolved) {
+    if (resolved && !resolved.colorCenter.cerrada) {
       const { pool, empresaId, colorCenter } = resolved
       const raw = await getEquiposBySucursal(pool, colorCenter.id)
       const equipos: EquipoWithEmpresa[] = raw.map((e) => ({

@@ -2,7 +2,7 @@ import { notFound } from "next/navigation"
 import Link from "next/link"
 import {
   findEquipoInAllBases,
-  getSucursalesByEmpresa,
+  getSucursalesByEmpresaConCerradas,
   getMovimientosByEquipoId,
   getIncidenciasByEquipoId,
   getFotosByEquipoId,
@@ -12,6 +12,7 @@ import {
 } from "@/lib/data"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { EquipoFotosSection } from "@/components/equipo-fotos-section"
+import { SucursalCerradaBadge } from "@/components/sucursal-cerrada-badge"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { userCanEditNormatividadFields, userCanWrite } from "@/lib/auth-roles"
@@ -54,7 +55,7 @@ export default async function EquipoDetailPage({ params }: { params: Promise<{ i
   const compositeId = buildEquipoCompositeId(empresaId, equipo)
 
   const [sucursales, mantenimientos, movimientos, incidencias, fotos, computadoraOrNull] = await Promise.all([
-    getSucursalesByEmpresa(empresaId),
+    getSucursalesByEmpresaConCerradas(empresaId),
     getMantenimientosByEquipoId(pool, equipo.id),
     getMovimientosByEquipoId(pool, equipo.id),
     getIncidenciasByEquipoId(pool, equipo.id),
@@ -201,7 +202,10 @@ export default async function EquipoDetailPage({ params }: { params: Promise<{ i
                   <Building2 className="h-5 w-5 text-primary/60 mt-0.5" />
                   <div>
                     <p className="text-sm text-muted-foreground">Sucursal</p>
-                    <p className="font-medium">{colorCenter?.nombre_sucursal || "Sin asignar"}</p>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="font-medium">{colorCenter?.nombre_sucursal || "Sin asignar"}</p>
+                      <SucursalCerradaBadge colorCenter={colorCenter} showFecha />
+                    </div>
                   </div>
                 </div>
 

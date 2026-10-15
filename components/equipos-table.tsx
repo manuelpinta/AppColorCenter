@@ -10,6 +10,7 @@ import { CheckCircle2, XCircle, WrenchIcon, Eye, ChevronRight } from "lucide-rea
 import Link from "next/link"
 import { TableColumnFilter } from "@/components/table-column-filter"
 import { TableSortHeader, type SortOrder } from "@/components/table-sort-header"
+import { SucursalCerradaBadge } from "@/components/sucursal-cerrada-badge"
 
 interface EquiposTableProps {
   equipos: EquipoWithEmpresa[]
@@ -176,6 +177,7 @@ export function EquiposTable({ equipos, colorCenters, canWrite }: EquiposTablePr
                       {colorCenter?.nombre_sucursal || "—"}
                       {equipo.numero_serie && ` · ${equipo.numero_serie}`}
                     </p>
+                    <SucursalCerradaBadge colorCenter={colorCenter} className="mt-1 text-xs" />
                     {showLeasingInfo && venc && dias != null && (dias < 0 || dias <= 30) && (
                       <p className="text-xs mt-1">
                         {dias < 0 ? (
@@ -252,7 +254,12 @@ export function EquiposTable({ equipos, colorCenters, canWrite }: EquiposTablePr
                     {equipo.marca} {equipo.modelo && `- ${equipo.modelo}`}
                   </td>
                   <td className="py-3 px-4 text-muted-foreground">{equipo.numero_serie || "-"}</td>
-                  <td className="py-3 px-4 text-muted-foreground">{colorCenter?.nombre_sucursal || "-"}</td>
+                  <td className="py-3 px-4 text-muted-foreground">
+                    <div className="flex items-center gap-2">
+                      <span>{colorCenter?.nombre_sucursal || "-"}</span>
+                      <SucursalCerradaBadge colorCenter={colorCenter} />
+                    </div>
+                  </td>
                   <td className="py-3 px-4">{getEstadoBadge(equipo.estado)}</td>
                   {showLeasingInfo && (
                     <td className="py-3 px-4">

@@ -94,6 +94,7 @@ export function SucursalFilterCombobox({
                     }}
                   >
                     {cc.nombre_sucursal} ({cc.codigo_interno})
+                    {cc.cerrada && <span className="ml-auto text-xs text-muted-foreground">Cerrada</span>}
                   </CommandItem>
                 )
               })}

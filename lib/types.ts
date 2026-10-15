@@ -21,6 +21,9 @@ export interface ColorCenter {
   notas: string | null
   created_at: string
   updated_at: string
+  /** Sucursal cerrada en la base comun (FechaTerm) que aún tiene equipos o incidencias registrados. Solo lectura. */
+  cerrada?: boolean
+  fecha_cierre?: string | null
 }
 
 export type TipoEquipo = "Tintometrico" | "Mezcladora" | "Regulador" | "Equipo de Computo"

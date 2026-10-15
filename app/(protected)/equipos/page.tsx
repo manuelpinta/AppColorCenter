@@ -2,15 +2,15 @@ import { Button } from "@/components/ui/button"
 import { Plus } from "lucide-react"
 import Link from "next/link"
 import { EquiposContent } from "@/components/equipos-content"
-import { getEquiposAllBases, getColorCentersAllBases } from "@/lib/data"
+import { getEquiposAllBases, getColorCentersConCerradasAllBases } from "@/lib/data"
 import { timed } from "@/lib/data/timing"
 import { userCanWrite } from "@/lib/auth-roles"
 
 export default async function EquiposPage() {
-  const [equipos, colorCenters] = await timed("equipos page (getEquiposAllBases + getColorCentersAllBases)", async () =>
+  const [equipos, colorCenters] = await timed("equipos page (getEquiposAllBases + getColorCentersConCerradasAllBases)", async () =>
     Promise.all([
       timed("getEquiposAllBases", () => getEquiposAllBases()),
-      timed("getColorCentersAllBases", () => getColorCentersAllBases()),
+      timed("getColorCentersConCerradasAllBases", () => getColorCentersConCerradasAllBases()),
     ])
   )
   const canWrite = await userCanWrite()
