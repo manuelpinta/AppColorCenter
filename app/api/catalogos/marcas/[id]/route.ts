@@ -3,6 +3,7 @@ import { getPool, getCatalogoMaestroEmpresaId, isEmpresaAllowedForRequest } from
 import { actualizarMarca, getMarcaById } from "@/lib/data/catalogos"
 import { updateMarcaInOtrasBases } from "@/lib/data/catalogos-sync"
 import { userHasRole } from "@/lib/auth-roles"
+import { apiError } from "@/lib/api-error"
 
 /** Actualiza una marca en el maestro y replica a las demás bases. Body: { nombre?: string, activo?: number, tipo_equipo_ids?: string[] }. */
 export async function PATCH(
@@ -53,10 +54,6 @@ export async function PATCH(
     )
     return NextResponse.json(row)
   } catch (err) {
-    console.error("PATCH /api/catalogos/marcas/[id]", err)
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Error al actualizar marca" },
-      { status: 500 }
-    )
+    return apiError(err, "Error al actualizar marca")
   }
 }

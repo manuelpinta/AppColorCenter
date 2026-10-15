@@ -1,9 +1,10 @@
 import type { Pool } from "mysql2/promise"
+import { ClientError } from "@/lib/client-error"
 
 /** Obtiene usuario por nombre; si no existe, lo crea y devuelve su id. Útil para reportado_por_id y tecnico_id. */
 export async function getOrCreateUsuarioByNombre(pool: Pool, nombre: string): Promise<number> {
   const trimmed = nombre.trim()
-  if (!trimmed) throw new Error("Nombre de usuario requerido")
+  if (!trimmed) throw new ClientError("Nombre de usuario requerido")
   const [rows] = await pool.query<{ id: number }[]>("SELECT id FROM usuarios WHERE nombre = ? AND activo = 1", [trimmed])
   const arr = Array.isArray(rows) ? rows : []
   if (arr[0]) return arr[0].id
@@ -97,5 +98,5 @@ export async function getDefaultUsuarioId(pool: Pool): Promise<number> {
   const [rows] = await pool.query<{ id: number }[]>("SELECT id FROM usuarios WHERE activo = 1 ORDER BY id ASC LIMIT 1")
   const arr = Array.isArray(rows) ? rows : []
   if (arr[0]) return arr[0].id
-  throw new Error("No hay usuarios activos en la base; crea al menos uno para registrar incidencias.")
+  throw new ClientError("No hay usuarios activos en la base; crea al menos uno para registrar incidencias.")
 }

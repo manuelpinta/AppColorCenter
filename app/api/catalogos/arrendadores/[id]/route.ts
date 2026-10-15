@@ -3,6 +3,7 @@ import { getPool, getCatalogoMaestroEmpresaId, isEmpresaAllowedForRequest } from
 import { actualizarArrendador, getArrendadorById } from "@/lib/data/catalogos"
 import { updateArrendadorInOtrasBases } from "@/lib/data/catalogos-sync"
 import { userHasRole } from "@/lib/auth-roles"
+import { apiError } from "@/lib/api-error"
 
 /** Actualiza un arrendador en el maestro y replica. Body: { nombre?: string, activo?: number } (activo 0 o 1). */
 export async function PATCH(
@@ -45,10 +46,6 @@ export async function PATCH(
     await updateArrendadorInOtrasBases(Number(id), row.nombre, row.activo)
     return NextResponse.json(row)
   } catch (err) {
-    console.error("PATCH /api/catalogos/arrendadores/[id]", err)
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Error al actualizar arrendador" },
-      { status: 500 }
-    )
+    return apiError(err, "Error al actualizar arrendador")
   }
 }

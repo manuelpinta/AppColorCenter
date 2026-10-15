@@ -3,6 +3,7 @@ import { findEquipoInAllBases, crearFotoEquipo, getEmpresaById } from "@/lib/dat
 import { getSupabaseServer, SUPABASE_BUCKET_FOTOS } from "@/lib/supabase"
 import { isEmpresaAllowedForRequest } from "@/lib/db"
 import { userCanWrite } from "@/lib/auth-roles"
+import { apiError } from "@/lib/api-error"
 
 function sanitizeFileName(name: string): string {
   return name.replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 100)
@@ -63,26 +64,12 @@ export async function POST(
         .from(SUPABASE_BUCKET_FOTOS)
         .upload(path, file, { contentType: file.type, upsert: false });
       if (uploadError) {
-        console.error("[Supabase Storage upload]", uploadError);
-        const detail = uploadError.message ?? uploadError.error ?? "";
-        return NextResponse.json(
-          {
-            error: "Error al subir la imagen. Revisa que el bucket exista y las variables SUPABASE_* estén configuradas.",
-            detail: detail || undefined,
-          },
-          { status: 502 }
-        );
+        return apiError(uploadError, "Error al subir la imagen", 502);
       }
       const { data: urlData } = supabase.storage.from(SUPABASE_BUCKET_FOTOS).getPublicUrl(uploadData.path);
       url = urlData.publicUrl;
     } catch (err) {
-      if (err instanceof Error && err.message.includes("SUPABASE")) {
-        return NextResponse.json(
-          { error: "Storage no configurado. Añade NEXT_PUBLIC_SUPABASE_URL y SUPABASE_SERVICE_ROLE_KEY o NEXT_PUBLIC_SUPABASE_ANON_KEY en .env" },
-          { status: 503 }
-        );
-      }
-      throw err;
+      return apiError(err, "No se pudo subir la imagen", 503);
     }
   } else {
     let body: { url: string; fecha_foto: string; descripcion?: string | null };
@@ -112,7 +99,6 @@ export async function POST(
     });
     return NextResponse.json({ foto });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Error al guardar la foto";
-    return NextResponse.json({ error: message }, { status: 400 });
+    return apiError(err, "Error al guardar la foto", 400);
   }
 }

@@ -49,6 +49,20 @@ export async function crearFotoEquipo(
   return mapFotoRow(row)
 }
 
-export async function eliminarFotoEquipo(pool: Pool, fotoId: string): Promise<void> {
-  await pool.query("DELETE FROM equipo_fotos WHERE id = ?", [fotoId])
+export async function getFotoEquipoUrl(pool: Pool, fotoId: string, equipoId: string): Promise<string | null> {
+  const [rows] = await pool.query<{ url: string }[]>(
+    "SELECT url FROM equipo_fotos WHERE id = ? AND equipo_id = ?",
+    [fotoId, equipoId]
+  )
+  const row = Array.isArray(rows) ? rows[0] : undefined
+  return row?.url ?? null
+}
+
+/** Borra la foto solo si pertenece a ese equipo. */
+export async function eliminarFotoEquipo(pool: Pool, fotoId: string, equipoId: string): Promise<boolean> {
+  const [result] = await pool.query(
+    "DELETE FROM equipo_fotos WHERE id = ? AND equipo_id = ?",
+    [fotoId, equipoId]
+  )
+  return ((result as { affectedRows?: number }).affectedRows ?? 0) > 0
 }

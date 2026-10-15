@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getPool, isEmpresaAllowedForRequest } from "@/lib/db"
 import { crearEquipo, parseEquipoId, buildEquipoCompositeId, actualizarComputadora } from "@/lib/data"
-import { EquipoValidationError } from "@/lib/data/equipos"
 import type { Equipo } from "@/lib/types"
 import type { EmpresaId } from "@/lib/db"
 import { userCanWrite } from "@/lib/auth-roles"
+import { apiError } from "@/lib/api-error"
 
 const bodyAllowed = [
   "color_center_id",
@@ -131,10 +131,6 @@ export async function POST(request: NextRequest) {
     const compositeId = buildEquipoCompositeId(empresaId as EmpresaId, equipo)
     return NextResponse.json({ equipo: { ...equipo, id: compositeId }, empresa_id: empresaId })
   } catch (err) {
-    if (err instanceof EquipoValidationError) {
-      return NextResponse.json({ error: err.message, field: err.field }, { status: 400 })
-    }
-    const message = err instanceof Error ? err.message : "Error al crear equipo"
-    return NextResponse.json({ error: message }, { status: 400 })
+    return apiError(err, "Error al crear equipo", 400)
   }
 }

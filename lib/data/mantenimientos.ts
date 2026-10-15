@@ -1,10 +1,11 @@
 import type { Pool } from "mysql2/promise"
 import type { Mantenimiento, MantenimientoWithEmpresa } from "@/lib/types"
+import { ClientError } from "@/lib/client-error"
 import type { EmpresaId } from "@/lib/db"
-import { getPool, getEmpresaIdsForDataLayer, EMPRESA_IDS, clearPool } from "@/lib/db"
+import { getPool, getEmpresaIdsForDataLayer, getEmpresaIdsToSearch, EMPRESA_IDS, clearPool } from "@/lib/db"
 import { getNombreUsuarioById } from "./usuarios"
 import { timed, withTimeout, getEmpresaQueryTimeoutMs } from "./timing"
-import { getCachedIf } from "./cache"
+import { getCachedIf, cacheKeyForEmpresas } from "./cache"
 
 type MantenimientoRow = {
   id: number
@@ -154,14 +155,14 @@ export async function crearMantenimiento(
     [data.tipo]
   )
   const tipoId = Array.isArray(tipoRows) && tipoRows[0] ? tipoRows[0].id : null
-  if (tipoId == null) throw new Error("Tipo de mantenimiento no encontrado")
+  if (tipoId == null) throw new ClientError("Tipo de mantenimiento no encontrado")
 
   const [estadoRows] = await pool.query<{ id: number }[]>(
     "SELECT id FROM cat_estados_mantenimiento WHERE nombre = ?",
     [data.estado]
   )
   const estadoId = Array.isArray(estadoRows) && estadoRows[0] ? estadoRows[0].id : null
-  if (estadoId == null) throw new Error("Estado de mantenimiento no encontrado")
+  if (estadoId == null) throw new ClientError("Estado de mantenimiento no encontrado")
 
   const caps = await getSchemaCapabilities(pool)
   const tecnicoId = data.realizado_por === "Externo" ? null : (data.tecnico_id ?? null)
@@ -246,7 +247,7 @@ export async function actualizarMantenimiento(
   if (data.tipo !== undefined) {
     const [rows] = await pool.query<{ id: number }[]>("SELECT id FROM cat_tipos_mantenimiento WHERE nombre = ?", [data.tipo])
     const id = Array.isArray(rows) && rows[0] ? rows[0].id : null
-    if (id == null) throw new Error("Tipo de mantenimiento no encontrado")
+    if (id == null) throw new ClientError("Tipo de mantenimiento no encontrado")
     updates.push("tipo_id = ?")
     values.push(id)
   }
@@ -254,7 +255,7 @@ export async function actualizarMantenimiento(
   if (data.estado !== undefined) {
     const [rows] = await pool.query<{ id: number }[]>("SELECT id FROM cat_estados_mantenimiento WHERE nombre = ?", [data.estado])
     const id = Array.isArray(rows) && rows[0] ? rows[0].id : null
-    if (id == null) throw new Error("Estado de mantenimiento no encontrado")
+    if (id == null) throw new ClientError("Estado de mantenimiento no encontrado")
     updates.push("estado_id = ?")
     values.push(id)
   }
@@ -299,18 +300,17 @@ export async function actualizarMantenimiento(
   }
 
   const mantenimiento = await getMantenimientoById(pool, mantenimientoId)
-  if (!mantenimiento) throw new Error("Mantenimiento no encontrado")
+  if (!mantenimiento) throw new ClientError("Mantenimiento no encontrado")
   return mantenimiento
 }
 
 export type { MantenimientoWithEmpresa } from "@/lib/types"
 
 /** Lista mantenimientos de todas las bases (sin cache). En paralelo por empresa; timeout por empresa; si hubo timeout no se cachea. */
-async function getMantenimientosAllBasesUncached(): Promise<{
+async function getMantenimientosAllBasesUncached(ids: EmpresaId[]): Promise<{
   data: MantenimientoWithEmpresa[]
   shouldCache: boolean
 }> {
-  const ids = await getEmpresaIdsForDataLayer()
   const timeoutMs = getEmpresaQueryTimeoutMs()
   let hadTimeout = false
   const arrays = await Promise.all(
@@ -355,7 +355,8 @@ async function getMantenimientosAllBasesUncached(): Promise<{
 
 /** Lista mantenimientos de todas las bases. Cache 60 s cuando todas las empresas respondieron; paralelo + timeout por empresa. */
 export async function getMantenimientosAllBases(): Promise<MantenimientoWithEmpresa[]> {
-  return getCachedIf("mantenimientosAllBases", getMantenimientosAllBasesUncached)
+  const ids = await getEmpresaIdsForDataLayer()
+  return getCachedIf(cacheKeyForEmpresas("mantenimientosAllBases", ids), () => getMantenimientosAllBasesUncached(ids))
 }
 
 function parseMantenimientoId(id: string): { empresaId?: EmpresaId; numericId: string } {
@@ -372,7 +373,7 @@ export async function findMantenimientoInAllBases(
   id: string
 ): Promise<{ mantenimiento: Mantenimiento; pool: Pool; empresaId: EmpresaId } | null> {
   const { empresaId: onlyEmpresa, numericId } = parseMantenimientoId(id)
-  const idsToTry = onlyEmpresa ? [onlyEmpresa] : await getEmpresaIdsForDataLayer()
+  const idsToTry = await getEmpresaIdsToSearch(onlyEmpresa)
   for (const empresaId of idsToTry) {
     const pool = await getPool(empresaId)
     const mant = await getMantenimientoById(pool, numericId)

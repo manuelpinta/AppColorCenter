@@ -1,10 +1,11 @@
 import type { Pool } from "mysql2/promise"
+import { ClientError } from "@/lib/client-error"
 import type { Incidencia, EstadoIncidencia, SeveridadIncidencia, IncidenciaWithEmpresa } from "@/lib/types"
 import type { EmpresaId } from "@/lib/db"
-import { getPool, getEmpresaIdsForDataLayer, EMPRESA_IDS } from "@/lib/db"
+import { getPool, getEmpresaIdsForDataLayer, getEmpresaIdsToSearch, EMPRESA_IDS } from "@/lib/db"
 import { getNombreUsuarioById, getDefaultUsuarioId } from "./usuarios"
 import { timed, withTimeout, getEmpresaQueryTimeoutMs } from "./timing"
-import { getCachedIf } from "./cache"
+import { getCachedIf, cacheKeyForEmpresas } from "./cache"
 
 type IncidenciaRow = {
   id: number
@@ -113,7 +114,7 @@ export async function crearIncidencia(
     [data.estado]
   )
   const estadoId = Array.isArray(estadoRows) && estadoRows[0] ? estadoRows[0].id : null
-  if (estadoId == null) throw new Error("Estado de incidencia no encontrado")
+  if (estadoId == null) throw new ClientError("Estado de incidencia no encontrado")
   let severidadId: number | null = null
   if (data.severidad) {
     const [sevRows] = await pool.query<{ id: number }[]>("SELECT id FROM cat_severidades WHERE nombre = ?", [data.severidad])
@@ -142,11 +143,10 @@ export async function crearIncidencia(
 export type { IncidenciaWithEmpresa } from "@/lib/types"
 
 /** Lista incidencias de todas las bases (sin cache). En paralelo por empresa; timeout por empresa; si hubo timeout no se cachea. */
-async function getIncidenciasAllBasesUncached(): Promise<{
+async function getIncidenciasAllBasesUncached(ids: EmpresaId[]): Promise<{
   data: IncidenciaWithEmpresa[]
   shouldCache: boolean
 }> {
-  const ids = await getEmpresaIdsForDataLayer()
   const timeoutMs = getEmpresaQueryTimeoutMs()
   let hadTimeout = false
   const arrays = await Promise.all(
@@ -179,7 +179,8 @@ async function getIncidenciasAllBasesUncached(): Promise<{
 
 /** Lista incidencias de todas las bases. Cache 60 s cuando todas las empresas respondieron; paralelo + timeout por empresa. */
 export async function getIncidenciasAllBases(): Promise<IncidenciaWithEmpresa[]> {
-  return getCachedIf("incidenciasAllBases", getIncidenciasAllBasesUncached)
+  const ids = await getEmpresaIdsForDataLayer()
+  return getCachedIf(cacheKeyForEmpresas("incidenciasAllBases", ids), () => getIncidenciasAllBasesUncached(ids))
 }
 
 /** Parsea id compuesto (emp-1-42) o numérico. */
@@ -198,7 +199,7 @@ export async function findIncidenciaInAllBases(
   id: string
 ): Promise<{ incidencia: Incidencia; pool: Pool; empresaId: EmpresaId } | null> {
   const { empresaId: onlyEmpresa, numericId } = parseIncidenciaId(id)
-  const idsToTry = onlyEmpresa ? [onlyEmpresa] : await getEmpresaIdsForDataLayer()
+  const idsToTry = await getEmpresaIdsToSearch(onlyEmpresa)
   for (const empresaId of idsToTry) {
     const pool = await getPool(empresaId)
     const inc = await getIncidenciaById(pool, numericId)

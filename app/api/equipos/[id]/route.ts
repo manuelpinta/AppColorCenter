@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getPool, isEmpresaAllowedForRequest } from "@/lib/db"
 import { actualizarEquipo, actualizarComputadora } from "@/lib/data"
-import { EquipoValidationError } from "@/lib/data/equipos"
 import type { Equipo } from "@/lib/types"
 import { userCanEditNormatividadFields, userCanWrite } from "@/lib/auth-roles"
+import { apiError } from "@/lib/api-error"
 
 const equipoAllowed = [
   "color_center_id", "tipo_equipo", "tipo_equipo_id", "marca", "marca_id", "modelo", "modelo_id", "numero_serie", "fecha_compra",
@@ -81,10 +81,6 @@ export async function PATCH(
     }
     return NextResponse.json({ equipo })
   } catch (err) {
-    if (err instanceof EquipoValidationError) {
-      return NextResponse.json({ error: err.message, field: err.field }, { status: 400 })
-    }
-    const message = err instanceof Error ? err.message : "Error al actualizar"
-    return NextResponse.json({ error: message }, { status: 400 })
+    return apiError(err, "Error al actualizar", 400)
   }
 }

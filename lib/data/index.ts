@@ -33,11 +33,13 @@ export {
 // Sucursales
 export {
   getSucursalesByEmpresa,
+  getSucursalesByEmpresaConCerradas,
   getSucursalesByEmpresaAndZona,
   getRegionesDisponibles,
   getRegionesDisponiblesAllBases,
   getRegionesFromColorCenters,
   getColorCentersAllBases,
+  getColorCentersConCerradasAllBases,
   getSucursalByCompositeId,
 } from "./sucursales"
 
@@ -59,6 +61,7 @@ export type { EquipoWithEmpresa } from "@/lib/types"
 // Fotos de equipo
 export {
   getFotosByEquipoId,
+  getFotoEquipoUrl,
   crearFotoEquipo,
   eliminarFotoEquipo,
 } from "./fotos"
@@ -66,6 +69,7 @@ export {
 // Fotos de mantenimiento
 export {
   getFotosByMantenimientoId,
+  getFotoMantenimientoUrl,
   crearFotoMantenimiento,
   eliminarFotoMantenimiento,
 } from "./mantenimiento-fotos"

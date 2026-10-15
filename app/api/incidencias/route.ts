@@ -5,6 +5,7 @@ import { parseEquipoId } from "@/lib/data"
 import { invalidateCachedList } from "@/lib/data/cache"
 import type { EstadoIncidencia, SeveridadIncidencia } from "@/lib/types"
 import { userCanWrite } from "@/lib/auth-roles"
+import { apiError } from "@/lib/api-error"
 
 /** Parsea sucursal_id que puede ser compuesto (emp-1-5) o numérico. */
 function parseSucursalId(id: string): { empresaId: string; numericId: string } {
@@ -94,7 +95,6 @@ export async function POST(request: NextRequest) {
       incidencia: { ...incidencia, id: idForClient, empresa_id: empresaIdToUse },
     })
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Error al crear incidencia"
-    return NextResponse.json({ error: message }, { status: 400 })
+    return apiError(err, "Error al crear incidencia", 400)
   }
 }

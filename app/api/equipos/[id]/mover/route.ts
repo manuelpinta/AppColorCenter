@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
-import { getPool, isEmpresaAllowedForRequest } from "@/lib/db"
-import { registrarMovimientoEquipo, parseEquipoId } from "@/lib/data"
+import { getPool, isEmpresaAllowedForRequest, type EmpresaId } from "@/lib/db"
+import { registrarMovimientoEquipo, parseEquipoId, getSucursalesByEmpresa } from "@/lib/data"
 import { userCanWrite } from "@/lib/auth-roles"
+import { apiError } from "@/lib/api-error"
 
 export async function POST(
   _request: NextRequest,
@@ -47,6 +48,10 @@ export async function POST(
   if (!(await isEmpresaAllowedForRequest(empresaIdForPool))) {
     return NextResponse.json({ error: "No tienes acceso a esta empresa" }, { status: 403 })
   }
+  const sucursalesActivas = await getSucursalesByEmpresa(empresaIdForPool as EmpresaId)
+  if (!sucursalesActivas.some((c) => c.id === sucursal_destino_id)) {
+    return NextResponse.json({ error: "La sucursal destino no existe o está cerrada" }, { status: 400 })
+  }
   try {
     const pool = await getPool(empresaIdForPool)
     const movimiento = await registrarMovimientoEquipo(
@@ -58,7 +63,6 @@ export async function POST(
     )
     return NextResponse.json({ movimiento })
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Error al registrar movimiento"
-    return NextResponse.json({ error: message }, { status: 400 })
+    return apiError(err, "Error al registrar movimiento", 400)
   }
 }

@@ -3,8 +3,9 @@ import { getPool, getCatalogoMaestroEmpresaId, getEmpresaIdForCatalogRead, isEmp
 import { getModelosAll, getModelosAllParaAdmin, getModelosByMarca, crearModelo } from "@/lib/data/catalogos"
 import { syncModeloToOtrasBases } from "@/lib/data/catalogos-sync"
 import { userHasRole } from "@/lib/auth-roles"
+import { apiError } from "@/lib/api-error"
 
-/** Lista modelos. ?empresa_id=emp-1 para leer de esa empresa; ?marca_id= filtrar; ?incluir_inactivos=1 para admin. */
+/** Lista modelos. ?empresa_id=emp-1 para leer de esa empresa; ?marca_id= filtrar; ?incluir_inactivos=1 solo Soporte Central. */
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
@@ -16,6 +17,9 @@ export async function GET(request: NextRequest) {
     const marcaId = searchParams.get("marca_id")
     const tipoEquipoId = searchParams.get("tipo_equipo_id")
     const incluirInactivos = searchParams.get("incluir_inactivos") === "1"
+    if (incluirInactivos && !(await userHasRole("soporte-central"))) {
+      return NextResponse.json({ error: "No tienes permisos para ver catálogos inactivos" }, { status: 403 })
+    }
     let items = incluirInactivos
       ? await getModelosAllParaAdmin(pool)
       : marcaId
@@ -32,11 +36,7 @@ export async function GET(request: NextRequest) {
     }
     return NextResponse.json(items)
   } catch (err) {
-    console.error("GET /api/catalogos/modelos", err)
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Error al listar modelos" },
-      { status: 500 }
-    )
+    return apiError(err, "Error al listar modelos")
   }
 }
 
@@ -74,10 +74,6 @@ export async function POST(request: NextRequest) {
     )
     return NextResponse.json(created)
   } catch (err) {
-    console.error("POST /api/catalogos/modelos", err)
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Error al crear modelo" },
-      { status: 500 }
-    )
+    return apiError(err, "Error al crear modelo")
   }
 }

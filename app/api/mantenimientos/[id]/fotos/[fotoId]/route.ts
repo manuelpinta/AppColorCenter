@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server"
 import { userCanWrite } from "@/lib/auth-roles"
 import { isEmpresaAllowedForRequest } from "@/lib/db"
-import { eliminarFotoMantenimiento, findMantenimientoInAllBases } from "@/lib/data"
+import { eliminarFotoMantenimiento, findMantenimientoInAllBases, getFotoMantenimientoUrl } from "@/lib/data"
+import { apiError } from "@/lib/api-error"
+import { removeStoredFoto } from "@/lib/supabase"
 
 export async function DELETE(
   _request: Request,
@@ -21,9 +23,17 @@ export async function DELETE(
   }
 
   try {
-    await eliminarFotoMantenimiento(found.pool, fotoId)
+    const url = await getFotoMantenimientoUrl(found.pool, fotoId, found.mantenimiento.id)
+    if (!url) {
+      return NextResponse.json({ error: "Foto no encontrada" }, { status: 404 })
+    }
+    await removeStoredFoto(url)
+    const deleted = await eliminarFotoMantenimiento(found.pool, fotoId, found.mantenimiento.id)
+    if (!deleted) {
+      return NextResponse.json({ error: "Foto no encontrada" }, { status: 404 })
+    }
     return NextResponse.json({ ok: true })
-  } catch {
-    return NextResponse.json({ error: "Error al eliminar foto" }, { status: 400 })
+  } catch (err) {
+    return apiError(err, "Error al eliminar la foto", 500)
   }
 }
