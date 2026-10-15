@@ -2,7 +2,8 @@ import type { Pool } from "mysql2/promise"
 import type { Mantenimiento, MantenimientoWithEmpresa } from "@/lib/types"
 import { ClientError } from "@/lib/client-error"
 import type { EmpresaId } from "@/lib/db"
-import { getPool, getEmpresaIdsForDataLayer, getEmpresaIdsToSearch, EMPRESA_IDS, clearPool } from "@/lib/db"
+import { getPool, getEmpresaIdsForDataLayer, getEmpresaIdsToSearch, clearPool } from "@/lib/db"
+import { parseId } from "./ids"
 import { getNombreUsuarioById } from "./usuarios"
 import { timed, withTimeout, getEmpresaQueryTimeoutMs } from "./timing"
 import { getCachedIf, cacheKeyForEmpresas } from "./cache"
@@ -359,20 +360,10 @@ export async function getMantenimientosAllBases(): Promise<MantenimientoWithEmpr
   return getCachedIf(cacheKeyForEmpresas("mantenimientosAllBases", ids), () => getMantenimientosAllBasesUncached(ids))
 }
 
-function parseMantenimientoId(id: string): { empresaId?: EmpresaId; numericId: string } {
-  const lastDash = id.lastIndexOf("-")
-  if (lastDash > 0 && id.startsWith("emp-")) {
-    const empresaId = id.slice(0, lastDash) as EmpresaId
-    const numericId = id.slice(lastDash + 1)
-    if (EMPRESA_IDS.includes(empresaId) && numericId) return { empresaId, numericId }
-  }
-  return { numericId: id }
-}
-
 export async function findMantenimientoInAllBases(
   id: string
 ): Promise<{ mantenimiento: Mantenimiento; pool: Pool; empresaId: EmpresaId } | null> {
-  const { empresaId: onlyEmpresa, numericId } = parseMantenimientoId(id)
+  const { empresaId: onlyEmpresa, numericId } = parseId(id, "recurso")
   const idsToTry = await getEmpresaIdsToSearch(onlyEmpresa)
   for (const empresaId of idsToTry) {
     const pool = await getPool(empresaId)

@@ -4,19 +4,7 @@ import { userCanWrite } from "@/lib/auth-roles"
 import { apiError } from "@/lib/api-error"
 import { isEmpresaAllowedForRequest } from "@/lib/db"
 import { actualizarMantenimiento, findMantenimientoInAllBases, getOrCreateUsuarioFromAuth0 } from "@/lib/data"
-import type { Mantenimiento } from "@/lib/types"
-
-type PatchBody = Partial<{
-  tipo: Mantenimiento["tipo"]
-  realizado_por: Mantenimiento["realizado_por"]
-  fecha_mantenimiento: string
-  descripcion: string
-  piezas_cambiadas: string | null
-  tiempo_fuera_servicio: number | null
-  costo: number | null
-  estado: Mantenimiento["estado"]
-  notas: string | null
-}>
+import { mantenimientoPatchSchema, readBody, readUrlId } from "@/lib/api-schemas"
 
 export async function PATCH(
   request: NextRequest,
@@ -27,6 +15,9 @@ export async function PATCH(
   }
 
   const { id } = await params
+  const urlId = readUrlId(id, "recurso")
+  if (!urlId.ok) return urlId.response
+
   const found = await findMantenimientoInAllBases(id)
   if (!found) {
     return NextResponse.json({ error: "Mantenimiento no encontrado" }, { status: 404 })
@@ -35,22 +26,9 @@ export async function PATCH(
     return NextResponse.json({ error: "No tienes acceso a esta empresa" }, { status: 403 })
   }
 
-  let body: PatchBody
-  try {
-    body = await request.json()
-  } catch {
-    return NextResponse.json({ error: "Cuerpo inválido" }, { status: 400 })
-  }
-
-  if (body.tipo && !["Preventivo", "Correctivo"].includes(body.tipo)) {
-    return NextResponse.json({ error: "tipo inválido" }, { status: 400 })
-  }
-  if (body.realizado_por && !["Interno", "Externo"].includes(body.realizado_por)) {
-    return NextResponse.json({ error: "realizado_por inválido" }, { status: 400 })
-  }
-  if (body.estado && !["Pendiente", "En Proceso", "Completado"].includes(body.estado)) {
-    return NextResponse.json({ error: "estado inválido" }, { status: 400 })
-  }
+  const parsed = await readBody(request, mantenimientoPatchSchema)
+  if (!parsed.ok) return parsed.response
+  const body = parsed.data
 
   try {
     const session = await auth0.getSession()
@@ -62,26 +40,18 @@ export async function PATCH(
     const realizadoPor = body.realizado_por ?? found.mantenimiento.realizado_por
 
     const mantenimiento = await actualizarMantenimiento(found.pool, found.mantenimiento.id, {
-      tipo: body.tipo,
-      realizado_por: body.realizado_por,
+      ...(body.tipo !== undefined ? { tipo: body.tipo } : {}),
+      ...(body.realizado_por !== undefined ? { realizado_por: body.realizado_por } : {}),
       tecnico_id: realizadoPor === "Externo" ? null : tecnicoId,
-      fecha_mantenimiento: body.fecha_mantenimiento,
-      descripcion: body.descripcion?.trim(),
-      piezas_cambiadas: body.piezas_cambiadas?.trim() || null,
-      tiempo_fuera_servicio:
-        body.tiempo_fuera_servicio != null && Number.isFinite(Number(body.tiempo_fuera_servicio))
-          ? Number(body.tiempo_fuera_servicio)
-          : body.tiempo_fuera_servicio === null
-            ? null
-            : undefined,
-      costo:
-        body.costo != null && Number.isFinite(Number(body.costo))
-          ? Number(body.costo)
-          : body.costo === null
-            ? null
-            : undefined,
-      estado: body.estado,
-      notas: body.notas?.trim() || null,
+      ...(body.fecha_mantenimiento !== undefined && body.fecha_mantenimiento !== null
+        ? { fecha_mantenimiento: body.fecha_mantenimiento }
+        : {}),
+      ...(body.descripcion !== undefined ? { descripcion: body.descripcion } : {}),
+      ...(body.piezas_cambiadas !== undefined ? { piezas_cambiadas: body.piezas_cambiadas } : {}),
+      ...(body.tiempo_fuera_servicio !== undefined ? { tiempo_fuera_servicio: body.tiempo_fuera_servicio } : {}),
+      ...(body.costo !== undefined ? { costo: body.costo } : {}),
+      ...(body.estado !== undefined ? { estado: body.estado } : {}),
+      ...(body.notas !== undefined ? { notas: body.notas } : {}),
     })
 
     return NextResponse.json({

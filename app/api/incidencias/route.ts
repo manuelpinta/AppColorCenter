@@ -1,93 +1,52 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getPool, isEmpresaAllowedForRequest } from "@/lib/db"
 import { crearIncidencia } from "@/lib/data"
-import { parseEquipoId } from "@/lib/data"
+import { parseId } from "@/lib/data/ids"
 import { invalidateCachedList } from "@/lib/data/cache"
-import type { EstadoIncidencia, SeveridadIncidencia } from "@/lib/types"
 import { userCanWrite } from "@/lib/auth-roles"
 import { apiError } from "@/lib/api-error"
-
-/** Parsea sucursal_id que puede ser compuesto (emp-1-5) o numérico. */
-function parseSucursalId(id: string): { empresaId: string; numericId: string } {
-  const lastDash = id.lastIndexOf("-")
-  if (lastDash > 0 && id.startsWith("emp-")) {
-    const empresaId = id.slice(0, lastDash)
-    const numericId = id.slice(lastDash + 1)
-    if (empresaId && numericId) return { empresaId, numericId }
-  }
-  return { empresaId: "", numericId: id }
-}
+import { incidenciaCreateSchema, readBody } from "@/lib/api-schemas"
 
 export async function POST(request: NextRequest) {
   if (!(await userCanWrite())) {
     return NextResponse.json({ error: "No tienes permisos para crear incidencias" }, { status: 403 })
   }
 
-  let body: {
-    sucursal_id: string
-    equipo_id?: string | null
-    fecha_reporte?: string
-    descripcion: string
-    severidad?: SeveridadIncidencia | null
-    estado?: EstadoIncidencia
-    notas?: string | null
-    empresa_id?: string
-  }
-  try {
-    body = await request.json()
-  } catch {
-    return NextResponse.json({ error: "Cuerpo de la solicitud inválido" }, { status: 400 })
-  }
-  const {
-    sucursal_id,
-    equipo_id = null,
-    fecha_reporte = new Date().toISOString().slice(0, 10),
-    descripcion,
-    severidad = null,
-    estado = "Reportada",
-    notas = null,
-    empresa_id: bodyEmpresaId,
-  } = body
-  if (!sucursal_id || typeof sucursal_id !== "string") {
-    return NextResponse.json({ error: "sucursal_id es requerido" }, { status: 400 })
-  }
-  if (!descripcion?.trim()) {
-    return NextResponse.json({ error: "descripcion es requerido" }, { status: 400 })
-  }
-  const validEstados: EstadoIncidencia[] = ["Reportada", "En atención", "Resuelta", "Cerrada"]
-  const validSeveridades: (SeveridadIncidencia | null)[] = [null, "Baja", "Media", "Alta", "Crítica"]
-  if (!validEstados.includes(estado)) {
-    return NextResponse.json({ error: "estado inválido" }, { status: 400 })
-  }
-  if (severidad !== null && !validSeveridades.includes(severidad)) {
-    return NextResponse.json({ error: "severidad inválida" }, { status: 400 })
-  }
-  const { empresaId, numericId: sucursalNumericId } = parseSucursalId(sucursal_id)
-  const empresaIdToUse = bodyEmpresaId ?? empresaId
-  if (!empresaIdToUse) {
+  const parsed = await readBody(request, incidenciaCreateSchema)
+  if (!parsed.ok) return parsed.response
+  const body = parsed.data
+
+  const sucursal = parseId(body.sucursal_id, "sucursal")
+  const empresaIdToUse = body.empresa_id ?? sucursal.empresaId
+  if (!empresaIdToUse || !/^\d+$/.test(sucursal.numericId)) {
     return NextResponse.json(
-      { error: "empresa_id es requerido o use sucursal_id compuesto (emp-1-5)" },
+      { error: "empresa_id es requerido o use sucursal_id compuesto (emp-1-5 o CODIGO-SUC)" },
       { status: 400 }
     )
   }
+
   let equipoNumericId: string | null = null
-  if (equipo_id) {
-    const parsed = parseEquipoId(equipo_id)
-    equipoNumericId = parsed.numericId
+  if (body.equipo_id && body.equipo_id.trim()) {
+    const equipo = parseId(body.equipo_id, "equipo")
+    if (!/^\d+$/.test(equipo.numericId)) {
+      return NextResponse.json({ error: "equipo_id inválido" }, { status: 400 })
+    }
+    equipoNumericId = equipo.numericId
   }
+
   if (!(await isEmpresaAllowedForRequest(empresaIdToUse))) {
     return NextResponse.json({ error: "No tienes acceso a esta empresa" }, { status: 403 })
   }
   try {
     const pool = await getPool(empresaIdToUse)
     const incidencia = await crearIncidencia(pool, {
-      sucursal_id: sucursalNumericId,
+      sucursal_id: sucursal.numericId,
       equipo_id: equipoNumericId,
-      fecha_reporte,
-      descripcion: descripcion.trim(),
-      severidad,
-      estado,
-      notas: notas?.trim() ?? null,
+      fecha_reporte: body.fecha_reporte ?? new Date().toISOString().slice(0, 10),
+      descripcion: body.descripcion,
+      severidad: body.severidad,
+      estado: body.estado ?? "Reportada",
+      notas: body.notas ?? null,
     })
     invalidateCachedList("incidenciasAllBases")
     const idForClient = `${empresaIdToUse}-${incidencia.id}`

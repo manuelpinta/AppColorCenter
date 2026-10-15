@@ -19,6 +19,7 @@ import type { ColorCenter, Empresa } from "@/lib/types"
 import type { EquipoWithEmpresa } from "@/lib/types"
 import { buildSucursalCompositeId } from "@/lib/data/ids"
 import { TableSortHeader, type SortOrder } from "@/components/table-sort-header"
+import { SucursalCerradaBadge } from "@/components/sucursal-cerrada-badge"
 
 const ITEMS_PER_PAGE = 25
 
@@ -130,7 +131,7 @@ export function SucursalesContent({
   const empresaStats = useMemo(
     () =>
       empresas.map((empresa) => {
-        const sucursales = colorCenters.filter((c) => c.empresa_id === empresa.id)
+        const sucursales = colorCenters.filter((c) => c.empresa_id === empresa.id && !c.cerrada)
         const operativas = sucursales.filter((s) => s.estado === "Operativo").length
         return { ...empresa, total: sucursales.length, operativas }
       }),
@@ -362,7 +363,10 @@ export function SucursalesContent({
                 <Card className="border border-border/60 shadow-sm card-elevated transition-all duration-200 active:bg-muted/30 rounded-2xl">
                   <CardContent className="p-4 flex items-center justify-between gap-3">
                     <div className="min-w-0 flex-1">
-                      <p className="text-base font-semibold text-foreground truncate">{center.nombre_sucursal}</p>
+                      <div className="flex items-center gap-2 min-w-0">
+                        <p className="text-base font-semibold text-foreground truncate">{center.nombre_sucursal}</p>
+                        <SucursalCerradaBadge colorCenter={center} />
+                      </div>
                       <p className="text-xs text-muted-foreground mt-0.5 truncate">
                         {secondaryParts.join(" · ")}
                       </p>
@@ -446,7 +450,10 @@ export function SucursalesContent({
                   <tr key={compositeId} className="hover:bg-muted/30 transition-colors">
                     <td className="py-3 px-4">
                       <div>
-                        <p className="font-medium text-sm">{center.nombre_sucursal}</p>
+                        <div className="flex items-center gap-2">
+                          <p className="font-medium text-sm">{center.nombre_sucursal}</p>
+                          <SucursalCerradaBadge colorCenter={center} showFecha />
+                        </div>
                         <p className="text-xs text-muted-foreground">{center.codigo_interno}</p>
                       </div>
                     </td>

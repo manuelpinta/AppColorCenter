@@ -12,6 +12,8 @@ import { EquiposTable } from "@/components/equipos-table"
 import { SucursalFilterCombobox } from "@/components/sucursal-filter-combobox"
 import type { Equipo, ColorCenter } from "@/lib/types"
 import type { EquipoWithEmpresa } from "@/lib/types"
+import type { EmpresaId } from "@/lib/empresas-config"
+import { buildSucursalCompositeIdFromIds } from "@/lib/data/ids"
 
 interface EquiposContentProps {
   equipos: EquipoWithEmpresa[]
@@ -51,7 +53,9 @@ export function EquiposContent({ equipos, colorCenters, canWrite }: EquiposConte
         (cc?.codigo_interno?.toLowerCase().includes(term))
       const matchSucursal =
         sucursalId === "all" ||
-        (eq.empresa_id && eq.color_center_id && `${eq.empresa_id}-${eq.color_center_id}` === sucursalId)
+        (eq.empresa_id &&
+          eq.color_center_id &&
+          buildSucursalCompositeIdFromIds(eq.empresa_id as EmpresaId, eq.color_center_id) === sucursalId)
       const matchPropiedad = propiedad === "all" || eq.tipo_propiedad === propiedad
       const matchPorVencer =
         !soloPorVencer ||

@@ -4,6 +4,7 @@ import { getCatalogoNombres, getTiposEquipoParaAdmin, crearTipoEquipo } from "@/
 import { syncCatTipoEquipoToOtrasBases } from "@/lib/data/catalogos-sync"
 import { userHasRole } from "@/lib/auth-roles"
 import { apiError } from "@/lib/api-error"
+import { catalogNombreSchema, readBody } from "@/lib/api-schemas"
 
 /** Lista tipos de equipo. ?empresa_id=emp-1 para leer de esa empresa; ?incluir_inactivos=1 solo Soporte Central. */
 export async function GET(request: NextRequest) {
@@ -35,16 +36,9 @@ export async function POST(request: NextRequest) {
   if (!(await userHasRole("soporte-central"))) {
     return NextResponse.json({ error: "No tienes permisos para gestionar tipos de equipo" }, { status: 403 })
   }
-  let body: { nombre?: string }
-  try {
-    body = await request.json()
-  } catch {
-    return NextResponse.json({ error: "Cuerpo inválido" }, { status: 400 })
-  }
-  const nombre = typeof body.nombre === "string" ? body.nombre.trim() : ""
-  if (!nombre) {
-    return NextResponse.json({ error: "nombre es requerido" }, { status: 400 })
-  }
+  const parsed = await readBody(request, catalogNombreSchema)
+  if (!parsed.ok) return parsed.response
+  const { nombre } = parsed.data
 
   try {
     const empresaId = getCatalogoMaestroEmpresaId()

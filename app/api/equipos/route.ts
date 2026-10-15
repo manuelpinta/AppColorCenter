@@ -1,93 +1,28 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getPool, isEmpresaAllowedForRequest } from "@/lib/db"
-import { crearEquipo, parseEquipoId, buildEquipoCompositeId, actualizarComputadora } from "@/lib/data"
-import type { Equipo } from "@/lib/types"
+import { crearEquipo, buildEquipoCompositeId, actualizarComputadora } from "@/lib/data"
 import type { EmpresaId } from "@/lib/db"
 import { userCanWrite } from "@/lib/auth-roles"
 import { apiError } from "@/lib/api-error"
-
-const bodyAllowed = [
-  "color_center_id",
-  "tipo_equipo",
-  "tipo_equipo_id",
-  "marca",
-  "marca_id",
-  "modelo",
-  "modelo_id",
-  "numero_serie",
-  "fecha_compra",
-  "tipo_propiedad",
-  "arrendador",
-  "fecha_vencimiento_arrendamiento",
-  "estado",
-  "ultima_calibracion",
-  "proxima_revision",
-  "notas",
-  "equipo_ups_id",
-  "equipo_regulador_id",
-  "equipo_impresora_id",
-] as const
+import { equipoCreateSchema, readBody } from "@/lib/api-schemas"
 
 export async function POST(request: NextRequest) {
   if (!(await userCanWrite())) {
     return NextResponse.json({ error: "No tienes permisos para crear equipos" }, { status: 403 })
   }
 
-  let body: Record<string, unknown>
-  try {
-    body = await request.json()
-  } catch {
-    return NextResponse.json({ error: "Cuerpo inválido" }, { status: 400 })
-  }
+  const parsed = await readBody(request, equipoCreateSchema)
+  if (!parsed.ok) return parsed.response
+  const data = parsed.data
 
-  const rawCcId = body.color_center_id
-  const rawEmpresaId = body.empresa_id
-  let empresaId: string
-  let sucursalIdNum: number
-
-  if (typeof rawCcId === "string" && rawCcId.includes("-") && rawCcId.startsWith("emp-")) {
-    const parsed = parseEquipoId(rawCcId)
-    if (!parsed.empresaId || !parsed.numericId) {
-      return NextResponse.json(
-        { error: "color_center_id compuesto inválido (ej: emp-1-5)" },
-        { status: 400 }
-      )
-    }
-    empresaId = parsed.empresaId
-    sucursalIdNum = Number(parsed.numericId)
-  } else if (typeof rawEmpresaId === "string" && (rawCcId === undefined || rawCcId === null || typeof rawCcId === "string")) {
-    empresaId = rawEmpresaId
-    const n = Number(rawCcId)
-    if (Number.isNaN(n) || n < 1) {
-      return NextResponse.json(
-        { error: "color_center_id (sucursal) numérico requerido" },
-        { status: 400 }
-      )
-    }
-    sucursalIdNum = n
-  } else {
+  const empresaId = data.color_center_id.empresaId ?? data.empresa_id
+  const sucursalIdNum = data.color_center_id.numericId
+  if (!empresaId) {
     return NextResponse.json(
-      { error: "Se requiere empresa_id y color_center_id, o color_center_id compuesto (emp-X-Y)" },
+      { error: "Se requiere empresa_id y color_center_id, o un id de sucursal compuesto" },
       { status: 400 }
     )
   }
-
-  const data: Record<string, unknown> = { color_center_id: sucursalIdNum }
-  for (const key of bodyAllowed) {
-    if (key !== "color_center_id" && body[key] !== undefined) data[key] = body[key]
-  }
-
-  const tipo_equipo = data.tipo_equipo as Equipo["tipo_equipo"] | undefined
-  const tipo_propiedad = data.tipo_propiedad as Equipo["tipo_propiedad"] | undefined
-  const estado = data.estado as Equipo["estado"] | undefined
-  if (!tipo_equipo || !tipo_propiedad || !estado) {
-    return NextResponse.json(
-      { error: "tipo_equipo, tipo_propiedad y estado son requeridos" },
-      { status: 400 }
-    )
-  }
-
-  const computadoraPayload = body.computadora
 
   if (!(await isEmpresaAllowedForRequest(empresaId))) {
     return NextResponse.json({ error: "No tienes acceso a esta empresa" }, { status: 403 })
@@ -97,36 +32,27 @@ export async function POST(request: NextRequest) {
     const pool = await getPool(empresaId)
     const equipo = await crearEquipo(pool, {
       color_center_id: sucursalIdNum,
-      tipo_equipo,
-      tipo_equipo_id: data.tipo_equipo_id != null ? Number(data.tipo_equipo_id) : undefined,
-      marca: (data.marca as string | null) ?? null,
-      marca_id: data.marca_id != null ? Number(data.marca_id) : undefined,
-      modelo: (data.modelo as string | null) ?? null,
-      modelo_id: data.modelo_id != null ? Number(data.modelo_id) : undefined,
-      numero_serie: (data.numero_serie as string | null) ?? null,
-      fecha_compra: (data.fecha_compra as string | null) ?? null,
-      tipo_propiedad,
-      arrendador: (data.arrendador as string | null) ?? null,
-      fecha_vencimiento_arrendamiento: (data.fecha_vencimiento_arrendamiento as string | null) ?? null,
-      estado,
-      ultima_calibracion: (data.ultima_calibracion as string | null) ?? null,
-      proxima_revision: (data.proxima_revision as string | null) ?? null,
-      notas: (data.notas as string | null) ?? null,
-      equipo_ups_id: data.equipo_ups_id != null ? Number(data.equipo_ups_id) : null,
-      equipo_regulador_id: data.equipo_regulador_id != null ? Number(data.equipo_regulador_id) : null,
-      equipo_impresora_id: data.equipo_impresora_id != null ? Number(data.equipo_impresora_id) : null,
+      tipo_equipo: data.tipo_equipo,
+      tipo_equipo_id: data.tipo_equipo_id,
+      marca: data.marca ?? null,
+      marca_id: data.marca_id,
+      modelo: data.modelo ?? null,
+      modelo_id: data.modelo_id,
+      numero_serie: data.numero_serie ?? null,
+      fecha_compra: data.fecha_compra ?? null,
+      tipo_propiedad: data.tipo_propiedad,
+      arrendador: data.arrendador ?? null,
+      fecha_vencimiento_arrendamiento: data.fecha_vencimiento_arrendamiento ?? null,
+      estado: data.estado,
+      ultima_calibracion: data.ultima_calibracion ?? null,
+      proxima_revision: data.proxima_revision ?? null,
+      notas: data.notas ?? null,
+      equipo_ups_id: data.equipo_ups_id ?? null,
+      equipo_regulador_id: data.equipo_regulador_id ?? null,
+      equipo_impresora_id: data.equipo_impresora_id ?? null,
     })
-    if (tipo_equipo === "Equipo de Computo" && computadoraPayload && typeof computadoraPayload === "object") {
-      const comp = computadoraPayload as Record<string, unknown>
-      await actualizarComputadora(pool, equipo.id, {
-        procesador: (comp.procesador as string | null) ?? null,
-        ram_gb: comp.ram_gb != null ? Number(comp.ram_gb) : null,
-        almacenamiento_gb: comp.almacenamiento_gb != null ? Number(comp.almacenamiento_gb) : null,
-        tipo_almacenamiento: (comp.tipo_almacenamiento as "SSD" | "HDD" | null) ?? null,
-        graficos: (comp.graficos as string | null) ?? null,
-        windows_version: (comp.windows_version as string | null) ?? null,
-        so_64bits: comp.so_64bits === true || comp.so_64bits === "true",
-      })
+    if (data.tipo_equipo === "Equipo de Computo" && data.computadora) {
+      await actualizarComputadora(pool, equipo.id, data.computadora)
     }
     const compositeId = buildEquipoCompositeId(empresaId as EmpresaId, equipo)
     return NextResponse.json({ equipo: { ...equipo, id: compositeId }, empresa_id: empresaId })

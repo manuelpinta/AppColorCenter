@@ -4,27 +4,40 @@ import { actualizarEquipo, actualizarComputadora } from "@/lib/data"
 import type { Equipo } from "@/lib/types"
 import { userCanEditNormatividadFields, userCanWrite } from "@/lib/auth-roles"
 import { apiError } from "@/lib/api-error"
+import { equipoPatchSchema, readBody, readUrlId, type EquipoPatchInput } from "@/lib/api-schemas"
 
 const equipoAllowed = [
-  "color_center_id", "tipo_equipo", "tipo_equipo_id", "marca", "marca_id", "modelo", "modelo_id", "numero_serie", "fecha_compra",
-  "tipo_propiedad", "arrendador", "fecha_vencimiento_arrendamiento", "estado",
-  "ultima_calibracion", "proxima_revision", "notas", "foto_url", "equipo_ups_id", "equipo_regulador_id", "equipo_impresora_id",
-]
-
-const computadoraAllowed = [
-  "procesador", "ram_gb", "almacenamiento_gb", "tipo_almacenamiento", "graficos",
-  "windows_version", "so_64bits",
-] as const
+  "color_center_id",
+  "tipo_equipo",
+  "tipo_equipo_id",
+  "marca",
+  "marca_id",
+  "modelo",
+  "modelo_id",
+  "numero_serie",
+  "fecha_compra",
+  "tipo_propiedad",
+  "arrendador",
+  "fecha_vencimiento_arrendamiento",
+  "estado",
+  "ultima_calibracion",
+  "proxima_revision",
+  "notas",
+  "foto_url",
+  "equipo_ups_id",
+  "equipo_regulador_id",
+  "equipo_impresora_id",
+] as const satisfies readonly (keyof EquipoPatchInput)[]
 
 const normatividadAllowed = [
   "fecha_compra",
   "tipo_propiedad",
   "arrendador",
   "fecha_vencimiento_arrendamiento",
-] as const
+] as const satisfies readonly (keyof EquipoPatchInput)[]
 
 export async function PATCH(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const [canWrite, canEditNormatividad] = await Promise.all([
@@ -36,48 +49,28 @@ export async function PATCH(
   }
 
   const { id } = await params
-  let body: Record<string, unknown>
-  try {
-    body = await _request.json()
-  } catch {
-    return NextResponse.json({ error: "Cuerpo inválido" }, { status: 400 })
-  }
-  const empresaId = typeof body.empresa_id === "string" ? body.empresa_id : null
-  if (!empresaId) {
-    return NextResponse.json(
-      { error: "empresa_id es requerido para actualizar equipo (multi-DB)" },
-      { status: 400 }
-    )
-  }
-  if (!(await isEmpresaAllowedForRequest(empresaId))) {
+  const urlId = readUrlId(id, "equipo")
+  if (!urlId.ok) return urlId.response
+
+  const parsed = await readBody(request, equipoPatchSchema)
+  if (!parsed.ok) return parsed.response
+  const body = parsed.data
+
+  if (!(await isEmpresaAllowedForRequest(body.empresa_id))) {
     return NextResponse.json({ error: "No tienes acceso a esta empresa" }, { status: 403 })
   }
+
   const data: Record<string, unknown> = {}
   const allowedFields = canWrite ? equipoAllowed : normatividadAllowed
   for (const key of allowedFields) {
     if (body[key] !== undefined) data[key] = body[key]
   }
+
   try {
-    const pool = await getPool(empresaId)
-    if (data.color_center_id !== undefined) data.color_center_id = Number(data.color_center_id)
-    if (data.tipo_equipo_id !== undefined) data.tipo_equipo_id = Number(data.tipo_equipo_id)
-    if (data.marca_id !== undefined) data.marca_id = Number(data.marca_id)
-    if (data.modelo_id !== undefined) data.modelo_id = Number(data.modelo_id)
-    if (data.equipo_ups_id !== undefined) data.equipo_ups_id = Number(data.equipo_ups_id)
-    if (data.equipo_regulador_id !== undefined) data.equipo_regulador_id = Number(data.equipo_regulador_id)
-    if (data.equipo_impresora_id !== undefined) data.equipo_impresora_id = Number(data.equipo_impresora_id)
-    const equipo = await actualizarEquipo(pool, id, data as Partial<Omit<Equipo, "id" | "created_at">>)
-    const computadoraPayload = body.computadora
-    if (canWrite && equipo.tipo_equipo === "Equipo de Computo" && computadoraPayload && typeof computadoraPayload === "object") {
-      const comp: Record<string, unknown> = {}
-      for (const key of computadoraAllowed) {
-        if ((computadoraPayload as Record<string, unknown>)[key] !== undefined) {
-          comp[key] = (computadoraPayload as Record<string, unknown>)[key]
-        }
-      }
-      if (comp.so_64bits === "true" || comp.so_64bits === true) comp.so_64bits = true
-      else if (comp.so_64bits === "false" || comp.so_64bits === false) comp.so_64bits = false
-      await actualizarComputadora(pool, id, comp as Parameters<typeof actualizarComputadora>[2])
+    const pool = await getPool(body.empresa_id)
+    const equipo = await actualizarEquipo(pool, urlId.numericId, data as Partial<Omit<Equipo, "id" | "created_at">>)
+    if (canWrite && equipo.tipo_equipo === "Equipo de Computo" && body.computadora) {
+      await actualizarComputadora(pool, urlId.numericId, body.computadora)
     }
     return NextResponse.json({ equipo })
   } catch (err) {

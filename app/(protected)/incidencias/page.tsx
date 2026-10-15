@@ -1,7 +1,7 @@
 import { IncidenciasContent } from "@/components/incidencias-content"
 import {
   getIncidenciasAllBases,
-  getColorCentersAllBases,
+  getColorCentersConCerradasAllBases,
   getEquiposAllBases,
 } from "@/lib/data"
 import { userCanWrite } from "@/lib/auth-roles"
@@ -9,7 +9,7 @@ import { userCanWrite } from "@/lib/auth-roles"
 export default async function IncidenciasPage() {
   const [incidencias, colorCenters, equipos] = await Promise.all([
     getIncidenciasAllBases(),
-    getColorCentersAllBases(),
+    getColorCentersConCerradasAllBases(),
     getEquiposAllBases(),
   ])
   const canWrite = await userCanWrite()

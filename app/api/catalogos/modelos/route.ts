@@ -4,6 +4,7 @@ import { getModelosAll, getModelosAllParaAdmin, getModelosByMarca, crearModelo }
 import { syncModeloToOtrasBases } from "@/lib/data/catalogos-sync"
 import { userHasRole } from "@/lib/auth-roles"
 import { apiError } from "@/lib/api-error"
+import { catalogModeloSchema, readBody } from "@/lib/api-schemas"
 
 /** Lista modelos. ?empresa_id=emp-1 para leer de esa empresa; ?marca_id= filtrar; ?incluir_inactivos=1 solo Soporte Central. */
 export async function GET(request: NextRequest) {
@@ -45,20 +46,9 @@ export async function POST(request: NextRequest) {
   if (!(await userHasRole("soporte-central"))) {
     return NextResponse.json({ error: "No tienes permisos para gestionar modelos" }, { status: 403 })
   }
-  let body: { marca_id?: string; nombre?: string }
-  try {
-    body = await request.json()
-  } catch {
-    return NextResponse.json({ error: "Cuerpo inválido" }, { status: 400 })
-  }
-  const marca_id = typeof body.marca_id === "string" ? body.marca_id.trim() : ""
-  const nombre = typeof body.nombre === "string" ? body.nombre.trim() : ""
-  if (!marca_id || !nombre) {
-    return NextResponse.json(
-      { error: "marca_id y nombre son requeridos" },
-      { status: 400 }
-    )
-  }
+  const parsed = await readBody(request, catalogModeloSchema)
+  if (!parsed.ok) return parsed.response
+  const { marca_id, nombre } = parsed.data
 
   try {
     const empresaId = getCatalogoMaestroEmpresaId()

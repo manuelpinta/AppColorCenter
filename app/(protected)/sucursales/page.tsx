@@ -1,5 +1,5 @@
 import {
-  getColorCentersAllBases,
+  getColorCentersConCerradasAllBases,
   getEquiposAllBases,
   getRegionesFromColorCenters,
 } from "@/lib/data"
@@ -8,7 +8,7 @@ import { SucursalesContent } from "@/components/sucursales-content"
 
 export default async function SucursalesPage() {
   const [colorCenters, equipos, empresas] = await Promise.all([
-    getColorCentersAllBases(),
+    getColorCentersConCerradasAllBases(),
     getEquiposAllBases(),
     getEmpresasForCurrentUser(),
   ])

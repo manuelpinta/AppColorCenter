@@ -14,6 +14,7 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 import { EquiposList } from "@/components/equipos-list"
+import { SucursalCerradaBadge } from "@/components/sucursal-cerrada-badge"
 import type { ColorCenter, Empresa, Incidencia } from "@/lib/types"
 import type { EquipoWithEmpresa } from "@/lib/types"
 
@@ -52,6 +53,7 @@ export function ColorCenterDetail({
     }
   }
 
+  const canAddRecords = canWrite && !colorCenter.cerrada
   const equiposOperativos = equipos.filter((e) => e.estado === "Operativo").length
   const equiposEnMantenimiento = equipos.filter(
     (e) => e.estado === "Mantenimiento" || e.estado === "Fuera de Servicio"
@@ -77,12 +79,22 @@ export function ColorCenterDetail({
             <h1 className="text-3xl font-bold text-foreground">{colorCenter.nombre_sucursal}</h1>
             <p className="text-muted-foreground mt-1">{colorCenter.codigo_interno}</p>
           </div>
-          <Badge
-            className={`${getEstadoBadgeColor(colorCenter.estado)} text-base px-4 py-1`}
-          >
-            {colorCenter.estado}
-          </Badge>
+          {colorCenter.cerrada ? (
+            <SucursalCerradaBadge colorCenter={colorCenter} showFecha className="text-base px-4 py-1" />
+          ) : (
+            <Badge
+              className={`${getEstadoBadgeColor(colorCenter.estado)} text-base px-4 py-1`}
+            >
+              {colorCenter.estado}
+            </Badge>
+          )}
         </div>
+        {colorCenter.cerrada && (
+          <p className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            Esta sucursal está cerrada. Se muestra solo para consultar su historial; usa “Mover a otra sucursal” en
+            cada equipo para reasignarlo.
+          </p>
+        )}
       </div>
 
       <Card className="mb-6">
@@ -169,7 +181,7 @@ export function ColorCenterDetail({
               Equipos ({equipos.length})
             </CardTitle>
             <div className="flex flex-wrap gap-2">
-              {canWrite && (
+              {canAddRecords && (
                 <>
                   <Link href={`/mantenimientos/crear?color_center_id=${sucursalIdForLinks}`}>
                     <Button size="sm" variant="outline" className="min-h-[44px] touch-manipulation">
@@ -192,7 +204,7 @@ export function ColorCenterDetail({
           <EquiposList
             equipos={equipos}
             colorCenterId={sucursalIdForLinks}
-            canWrite={canWrite}
+            canWrite={canAddRecords}
             showLeasingInfo={showLeasingInfo}
           />
         </CardContent>
@@ -205,7 +217,7 @@ export function ColorCenterDetail({
               <AlertTriangle className="h-5 w-5" />
               Incidencias ({incidencias.length})
             </CardTitle>
-            {canWrite && (
+            {canAddRecords && (
               <Link href={`/incidencias/crear?sucursal_id=${sucursalIdForLinks}`}>
                 <Button size="sm" variant="outline" className="min-h-[44px] touch-manipulation">
                   <AlertTriangle className="h-4 w-4 mr-2" />

@@ -18,21 +18,66 @@ export function buildSucursalCompositeIdFromIds(empresaId: EmpresaId, sucursalId
   return `${codigo}-SUC${sucursalId}`
 }
 
-export function parseSucursalId(id: string): { empresaId?: EmpresaId; numericId: string } {
-  const parts = id.split("-")
+export type ParsedId = { empresaId?: EmpresaId; numericId: string }
+
+/**
+ * Qué formato compuesto aceptar, además del numérico y de `emp-N-id`.
+ * - recurso: mantenimiento, incidencia o catálogo (`42`, `emp-2-42`)
+ * - sucursal: además `GALLCO-SUC41`
+ * - equipo: además `GALLCO-105-45`
+ * - auto: los tres
+ */
+export type ParseIdKind = "auto" | "sucursal" | "equipo" | "recurso"
+
+function parseSucursalCodigo(value: string): ParsedId | null {
+  const parts = value.split("-")
   if (parts.length === 2 && parts[1].toUpperCase().startsWith("SUC")) {
-    const [codigo, sucPart] = parts
-    const empresa = getEmpresaByCodigo(codigo)
-    const numericId = sucPart.slice(3)
+    const empresa = getEmpresaByCodigo(parts[0])
+    const numericId = parts[1].slice(3)
     if (empresa && numericId) return { empresaId: empresa.id as EmpresaId, numericId }
   }
-  const lastDash = id.lastIndexOf("-")
-  if (lastDash > 0 && id.startsWith("emp-")) {
-    const empresaId = id.slice(0, lastDash) as EmpresaId
-    const numericId = id.slice(lastDash + 1)
+  return null
+}
+
+function parseEquipoCodigo(value: string): ParsedId | null {
+  const parts = value.split("-")
+  if (parts.length === 3 && !value.startsWith("emp-")) {
+    const empresa = getEmpresaByCodigo(parts[0])
+    const numericId = parts[2]
+    if (empresa && numericId) return { empresaId: empresa.id as EmpresaId, numericId }
+  }
+  return null
+}
+
+function parseEmpSuffix(value: string): ParsedId | null {
+  const lastDash = value.lastIndexOf("-")
+  if (lastDash > 0 && value.startsWith("emp-")) {
+    const empresaId = value.slice(0, lastDash) as EmpresaId
+    const numericId = value.slice(lastDash + 1)
     if (EMPRESA_IDS.includes(empresaId) && numericId) return { empresaId, numericId }
   }
-  return { numericId: id }
+  return null
+}
+
+/** Un solo lector para los ids de la URL y de los cuerpos (numérico o compuesto). */
+export function parseId(id: string, kind: ParseIdKind = "auto"): ParsedId {
+  const value = id.trim()
+  if (!value) return { numericId: "" }
+  if (kind === "auto" || kind === "sucursal") {
+    const sucursal = parseSucursalCodigo(value)
+    if (sucursal) return sucursal
+  }
+  if (kind === "auto" || kind === "equipo") {
+    const equipo = parseEquipoCodigo(value)
+    if (equipo) return equipo
+  }
+  const emp = parseEmpSuffix(value)
+  if (emp) return emp
+  return { numericId: value }
+}
+
+export function parseSucursalId(id: string): ParsedId {
+  return parseId(id, "sucursal")
 }
 
 export function buildEquipoCompositeId(empresaId: EmpresaId, equipo: Equipo): string {
@@ -41,25 +86,8 @@ export function buildEquipoCompositeId(empresaId: EmpresaId, equipo: Equipo): st
   return `${codigo}-${equipo.color_center_id}-${equipo.id}`
 }
 
-export function parseEquipoId(equipoId: string): { empresaId?: EmpresaId; numericId: string } {
-  const parts = equipoId.split("-")
-  if (parts.length === 3) {
-    const [codigo, , numericId] = parts
-    const empresa = getEmpresaByCodigo(codigo)
-    if (empresa && numericId) return { empresaId: empresa.id as EmpresaId, numericId }
-  }
-  if (parts.length === 3 && equipoId.startsWith("emp-")) {
-    const empresaId = `${parts[0]}-${parts[1]}` as EmpresaId
-    const numericId = parts[2]
-    if (EMPRESA_IDS.includes(empresaId) && numericId) return { empresaId, numericId }
-  }
-  const lastDash = equipoId.lastIndexOf("-")
-  if (lastDash > 0 && equipoId.startsWith("emp-")) {
-    const empresaId = equipoId.slice(0, lastDash) as EmpresaId
-    const numericId = equipoId.slice(lastDash + 1)
-    if (EMPRESA_IDS.includes(empresaId) && numericId) return { empresaId, numericId }
-  }
-  return { numericId: equipoId }
+export function parseEquipoId(equipoId: string): ParsedId {
+  return parseId(equipoId, "equipo")
 }
 
 /** Alinea `?equipo_id=` de la URL con el id compuesto usado en listados (p. ej. Select de mantenimientos). */

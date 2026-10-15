@@ -2,7 +2,8 @@ import type { Pool } from "mysql2/promise"
 import { ClientError } from "@/lib/client-error"
 import type { Incidencia, EstadoIncidencia, SeveridadIncidencia, IncidenciaWithEmpresa } from "@/lib/types"
 import type { EmpresaId } from "@/lib/db"
-import { getPool, getEmpresaIdsForDataLayer, getEmpresaIdsToSearch, EMPRESA_IDS } from "@/lib/db"
+import { getPool, getEmpresaIdsForDataLayer, getEmpresaIdsToSearch } from "@/lib/db"
+import { parseId } from "./ids"
 import { getNombreUsuarioById, getDefaultUsuarioId } from "./usuarios"
 import { timed, withTimeout, getEmpresaQueryTimeoutMs } from "./timing"
 import { getCachedIf, cacheKeyForEmpresas } from "./cache"
@@ -183,22 +184,11 @@ export async function getIncidenciasAllBases(): Promise<IncidenciaWithEmpresa[]>
   return getCachedIf(cacheKeyForEmpresas("incidenciasAllBases", ids), () => getIncidenciasAllBasesUncached(ids))
 }
 
-/** Parsea id compuesto (emp-1-42) o numérico. */
-function parseIncidenciaId(id: string): { empresaId?: EmpresaId; numericId: string } {
-  const lastDash = id.lastIndexOf("-")
-  if (lastDash > 0 && id.startsWith("emp-")) {
-    const empresaId = id.slice(0, lastDash) as EmpresaId
-    const numericId = id.slice(lastDash + 1)
-    if (EMPRESA_IDS.includes(empresaId) && numericId) return { empresaId, numericId }
-  }
-  return { numericId: id }
-}
-
 /** Busca una incidencia por id (compuesto o numérico en todas las bases). */
 export async function findIncidenciaInAllBases(
   id: string
 ): Promise<{ incidencia: Incidencia; pool: Pool; empresaId: EmpresaId } | null> {
-  const { empresaId: onlyEmpresa, numericId } = parseIncidenciaId(id)
+  const { empresaId: onlyEmpresa, numericId } = parseId(id, "recurso")
   const idsToTry = await getEmpresaIdsToSearch(onlyEmpresa)
   for (const empresaId of idsToTry) {
     const pool = await getPool(empresaId)

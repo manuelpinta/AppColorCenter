@@ -1,4 +1,4 @@
-import type { Pool } from "mysql2/promise"
+import type { Pool, RowDataPacket } from "mysql2/promise"
 import type { ColorCenter } from "@/lib/types"
 import type { EmpresaId } from "@/lib/db"
 import {
@@ -6,6 +6,7 @@ import {
   getComunPool,
   clearComunPool,
   getEmpresaIdsForDataLayer,
+  getEmpresaIdsToSearch,
   hasComunForEmpresa,
   getSucursalesTableConfig,
   getZonasTableConfig,
@@ -13,7 +14,7 @@ import {
 } from "@/lib/db"
 import { parseSucursalId } from "./ids"
 import { timed, withTimeout, getEmpresaQueryTimeoutMs } from "./timing"
-import { getCachedIf } from "./cache"
+import { getCachedIf, cacheKeyForEmpresas } from "./cache"
 
 /** Convierte fila de sucursales + JOINs a ColorCenter con empresa_id de la app. */
 function mapSucursalRow(row: Record<string, unknown>, empresaId: string): ColorCenter {
@@ -171,6 +172,62 @@ export async function getSucursalesByEmpresa(empresaId: EmpresaId): Promise<Colo
 }
 
 /**
+ * Sucursales cerradas (fuera del filtro de activas en la base comun) que todavía tienen equipos o incidencias
+ * en la base Color Center. Sin base comun no aplica: la tabla local ya incluye todas las sucursales.
+ */
+async function getSucursalesCerradasConRegistros(
+  empresaId: EmpresaId,
+  activas: ColorCenter[]
+): Promise<ColorCenter[]> {
+  if (!hasComunForEmpresa(empresaId)) return []
+
+  const pool = await getPool(empresaId)
+  const [refRows] = await pool.query<RowDataPacket[]>(
+    `SELECT sucursal_id FROM equipos WHERE sucursal_id IS NOT NULL
+     UNION
+     SELECT sucursal_id FROM incidencias WHERE sucursal_id IS NOT NULL`
+  )
+  const activeIds = new Set(activas.map((c) => c.id))
+  const missingIds = refRows.map((r) => String(r.sucursal_id)).filter((id) => !activeIds.has(id))
+  if (missingIds.length === 0) return []
+
+  const cfg = getSucursalesTableConfig()
+  const comun = await getComunPool(empresaId)
+  const [rows] = await comun.query<RowDataPacket[]>(
+    `SELECT ?? as id, ?? as nombre_sucursal, ?? as region, FechaTerm as fecha_cierre
+     FROM ?? WHERE ?? IN (?) AND FechaTerm <> '' ORDER BY ??`,
+    [cfg.idCol, cfg.nombreCol, cfg.zonaCol, cfg.table, cfg.idCol, missingIds, cfg.nombreCol]
+  )
+
+  return rows.map((r) => ({
+    id: String(r.id ?? ""),
+    empresa_id: empresaId,
+    codigo_interno: String(r.id ?? ""),
+    nombre_sucursal: String(r.nombre_sucursal ?? ""),
+    region: r.region != null && r.region !== "" ? String(r.region) : null,
+    ubicacion: null,
+    responsable: null,
+    fecha_instalacion: null,
+    estado: "Inactivo" as const,
+    notas: null,
+    created_at: "",
+    updated_at: "",
+    cerrada: true,
+    fecha_cierre: r.fecha_cierre != null && String(r.fecha_cierre).trim() !== "" ? String(r.fecha_cierre).trim() : null,
+  }))
+}
+
+/**
+ * Sucursales activas más las cerradas que aún tienen equipos o incidencias (marcadas con `cerrada: true`).
+ * Para listados de consulta y fichas; los formularios deben seguir usando solo las activas.
+ */
+export async function getSucursalesByEmpresaConCerradas(empresaId: EmpresaId): Promise<ColorCenter[]> {
+  const activas = await getSucursalesByEmpresa(empresaId)
+  const cerradas = await getSucursalesCerradasConRegistros(empresaId, activas)
+  return cerradas.length > 0 ? [...activas, ...cerradas] : activas
+}
+
+/**
  * Sucursales por empresa y opcionalmente por zona (región).
  */
 export async function getSucursalesByEmpresaAndZona(
@@ -183,8 +240,10 @@ export async function getSucursalesByEmpresaAndZona(
 }
 
 /** Sucursales de todas las bases (sin cache). Timeout por empresa para no bloquear. Si hubo timeout, no cachear. */
-async function getColorCentersAllBasesUncached(): Promise<{ data: ColorCenter[]; shouldCache: boolean }> {
-  const ids = await getEmpresaIdsForDataLayer()
+async function getColorCentersAllBasesUncached(
+  ids: EmpresaId[],
+  loadEmpresa: (empresaId: EmpresaId) => Promise<ColorCenter[]> = getSucursalesByEmpresa
+): Promise<{ data: ColorCenter[]; shouldCache: boolean }> {
   const timeoutMs = getEmpresaQueryTimeoutMs()
   let hadTimeout = false
   const arrays = await Promise.all(
@@ -195,7 +254,7 @@ async function getColorCentersAllBasesUncached(): Promise<{ data: ColorCenter[];
           withTimeout(
             timeoutMs,
             `getColorCenters(${empresaId})`,
-            () => getSucursalesByEmpresa(empresaId),
+            () => loadEmpresa(empresaId),
             [],
             () => {
               hadTimeout = true
@@ -227,7 +286,20 @@ function sortColorCentersStable(list: ColorCenter[]): void {
 
 /** Sucursales de todas las bases (cada una con empresa_id). Cache corto solo cuando todas las empresas respondieron. */
 export async function getColorCentersAllBases(): Promise<ColorCenter[]> {
-  const data = await getCachedIf("colorCentersAllBases", getColorCentersAllBasesUncached)
+  const ids = await getEmpresaIdsForDataLayer()
+  const data = await getCachedIf(cacheKeyForEmpresas("colorCentersAllBases", ids), () =>
+    getColorCentersAllBasesUncached(ids)
+  )
+  sortColorCentersStable(data)
+  return data
+}
+
+/** Como getColorCentersAllBases, más las sucursales cerradas que aún tienen equipos o incidencias. */
+export async function getColorCentersConCerradasAllBases(): Promise<ColorCenter[]> {
+  const ids = await getEmpresaIdsForDataLayer()
+  const data = await getCachedIf(cacheKeyForEmpresas("colorCentersConCerradasAllBases", ids), () =>
+    getColorCentersAllBasesUncached(ids, getSucursalesByEmpresaConCerradas)
+  )
   sortColorCentersStable(data)
   return data
 }
@@ -274,15 +346,16 @@ export function getRegionesFromColorCenters(colorCenters: ColorCenter[]): string
 
 /**
  * Busca una sucursal por id (compuesto emp-1-5 o numérico en todas las bases).
+ * Incluye cerradas con registros (`colorCenter.cerrada`), para que su ficha siga abriendo en solo lectura.
  * Devuelve colorCenter, pool (Color Center para esa empresa) y empresaId.
  */
 export async function getSucursalByCompositeId(
   id: string
 ): Promise<{ colorCenter: ColorCenter; pool: Pool; empresaId: EmpresaId } | null> {
   const { empresaId: onlyEmpresa, numericId } = parseSucursalId(id)
-  const idsToTry = onlyEmpresa ? [onlyEmpresa] : await getEmpresaIdsForDataLayer()
+  const idsToTry = await getEmpresaIdsToSearch(onlyEmpresa)
   for (const empresaId of idsToTry) {
-    const list = await getSucursalesByEmpresa(empresaId)
+    const list = await getSucursalesByEmpresaConCerradas(empresaId)
     const colorCenter = list.find((c) => c.id === numericId)
     if (colorCenter) {
       const pool = await getPool(empresaId)
