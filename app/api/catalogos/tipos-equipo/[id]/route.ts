@@ -4,6 +4,7 @@ import { actualizarTipoEquipo, getTipoEquipoById } from "@/lib/data/catalogos"
 import { updateCatTipoEquipoInOtrasBases } from "@/lib/data/catalogos-sync"
 import { userHasRole } from "@/lib/auth-roles"
 import { apiError } from "@/lib/api-error"
+import { catalogNombrePatchSchema, readBody, readUrlId } from "@/lib/api-schemas"
 
 /** Actualiza un tipo de equipo en el maestro y replica. Body: { nombre?: string, activo?: number } (activo 0 o 1). */
 export async function PATCH(
@@ -13,24 +14,13 @@ export async function PATCH(
   if (!(await userHasRole("soporte-central"))) {
     return NextResponse.json({ error: "No tienes permisos para gestionar tipos de equipo" }, { status: 403 })
   }
-  const { id } = await params
-  if (!id) {
-    return NextResponse.json({ error: "id requerido" }, { status: 400 })
-  }
-  let body: { nombre?: string; activo?: number }
-  try {
-    body = await request.json()
-  } catch {
-    return NextResponse.json({ error: "Cuerpo inválido" }, { status: 400 })
-  }
-  const data: { nombre?: string; activo?: number } = {}
-  if (typeof body.nombre === "string") data.nombre = body.nombre.trim()
-  if (typeof body.activo === "number") data.activo = body.activo === 1 ? 1 : 0
-  if (body.activo === true) data.activo = 1
-  if (body.activo === false) data.activo = 0
-  if (Object.keys(data).length === 0) {
-    return NextResponse.json({ error: "Enviar nombre y/o activo" }, { status: 400 })
-  }
+  const { id: rawId } = await params
+  const urlId = readUrlId(rawId, "recurso")
+  if (!urlId.ok) return urlId.response
+  const id = urlId.numericId
+  const parsed = await readBody(request, catalogNombrePatchSchema)
+  if (!parsed.ok) return parsed.response
+  const data = parsed.data
 
   try {
     const empresaId = getCatalogoMaestroEmpresaId()

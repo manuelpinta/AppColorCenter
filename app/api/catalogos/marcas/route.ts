@@ -4,6 +4,7 @@ import { getMarcasEquipo, getMarcasEquipoByTipo, getMarcasEquipoParaAdmin, crear
 import { syncMarcaToOtrasBases } from "@/lib/data/catalogos-sync"
 import { userHasRole } from "@/lib/auth-roles"
 import { apiError } from "@/lib/api-error"
+import { catalogMarcaSchema, readBody } from "@/lib/api-schemas"
 
 /** Lista marcas. ?empresa_id=emp-1 para leer de esa empresa (país/contexto); si no, maestro. ?incluir_inactivos=1 solo Soporte Central. */
 export async function GET(request: NextRequest) {
@@ -36,22 +37,9 @@ export async function POST(request: NextRequest) {
   if (!(await userHasRole("soporte-central"))) {
     return NextResponse.json({ error: "No tienes permisos para gestionar marcas" }, { status: 403 })
   }
-  let body: { nombre?: string; tipo_equipo_ids?: unknown }
-  try {
-    body = await request.json()
-  } catch {
-    return NextResponse.json({ error: "Cuerpo inválido" }, { status: 400 })
-  }
-  const nombre = typeof body.nombre === "string" ? body.nombre.trim() : ""
-  const tipoEquipoIds = Array.isArray(body.tipo_equipo_ids)
-    ? body.tipo_equipo_ids.map((x) => String(x))
-    : []
-  if (!nombre) {
-    return NextResponse.json({ error: "nombre es requerido" }, { status: 400 })
-  }
-  if (tipoEquipoIds.length === 0) {
-    return NextResponse.json({ error: "tipo_equipo_ids es requerido" }, { status: 400 })
-  }
+  const parsed = await readBody(request, catalogMarcaSchema)
+  if (!parsed.ok) return parsed.response
+  const { nombre, tipo_equipo_ids: tipoEquipoIds } = parsed.data
 
   try {
     const empresaId = getCatalogoMaestroEmpresaId()

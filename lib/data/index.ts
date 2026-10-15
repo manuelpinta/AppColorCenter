@@ -23,6 +23,7 @@ export {
 export {
   buildSucursalCompositeId,
   buildSucursalCompositeIdFromIds,
+  parseId,
   parseSucursalId,
   buildEquipoCompositeId,
   parseEquipoId,

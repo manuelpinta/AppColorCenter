@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getPool, isEmpresaAllowedForRequest, type EmpresaId } from "@/lib/db"
-import { registrarMovimientoEquipo, parseEquipoId, getSucursalesByEmpresa } from "@/lib/data"
+import { registrarMovimientoEquipo, getSucursalesByEmpresa } from "@/lib/data"
 import { userCanWrite } from "@/lib/auth-roles"
 import { apiError } from "@/lib/api-error"
+import { moverEquipoSchema, readBody, readUrlId } from "@/lib/api-schemas"
+import { parseId } from "@/lib/data/ids"
 
 export async function POST(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   if (!(await userCanWrite())) {
@@ -13,33 +15,20 @@ export async function POST(
   }
 
   const { id: equipoIdParam } = await params
-  const { empresaId: parsedEmpresaId, numericId } = parseEquipoId(equipoIdParam)
-  const empresa_id = parsedEmpresaId
-  const equipoId = numericId
+  const urlId = readUrlId(equipoIdParam, "equipo")
+  if (!urlId.ok) return urlId.response
 
-  let body: {
-    sucursal_destino_id: string
-    motivo?: string | null
-    registrado_por?: string | null
-    empresa_id?: string
+  const parsed = await readBody(request, moverEquipoSchema)
+  if (!parsed.ok) return parsed.response
+  const body = parsed.data
+
+  const destino = parseId(body.sucursal_destino_id, "sucursal")
+  if (!/^\d+$/.test(destino.numericId)) {
+    return NextResponse.json({ error: "sucursal_destino_id inválido" }, { status: 400 })
   }
-  try {
-    body = await _request.json()
-  } catch {
-    return NextResponse.json(
-      { error: "Cuerpo de la solicitud inválido" },
-      { status: 400 }
-    )
-  }
-  const { sucursal_destino_id, motivo = null, registrado_por = null, empresa_id: bodyEmpresaId } = body
-  if (!sucursal_destino_id || typeof sucursal_destino_id !== "string") {
-    return NextResponse.json(
-      { error: "sucursal_destino_id es requerido" },
-      { status: 400 }
-    )
-  }
-  const empresaIdForPool = empresa_id ?? bodyEmpresaId
-  if (!empresaIdForPool || typeof empresaIdForPool !== "string") {
+
+  const empresaIdForPool = urlId.parsed.empresaId ?? body.empresa_id
+  if (!empresaIdForPool) {
     return NextResponse.json(
       { error: "empresa_id es requerido (multi-DB) o usa id compuesto en la URL (ej. GALLCO-105-45)" },
       { status: 400 }
@@ -49,17 +38,17 @@ export async function POST(
     return NextResponse.json({ error: "No tienes acceso a esta empresa" }, { status: 403 })
   }
   const sucursalesActivas = await getSucursalesByEmpresa(empresaIdForPool as EmpresaId)
-  if (!sucursalesActivas.some((c) => c.id === sucursal_destino_id)) {
+  if (!sucursalesActivas.some((c) => c.id === destino.numericId)) {
     return NextResponse.json({ error: "La sucursal destino no existe o está cerrada" }, { status: 400 })
   }
   try {
     const pool = await getPool(empresaIdForPool)
     const movimiento = await registrarMovimientoEquipo(
       pool,
-      equipoId,
-      sucursal_destino_id,
-      motivo ?? null,
-      registrado_por ?? null
+      urlId.numericId,
+      destino.numericId,
+      body.motivo ?? null,
+      body.registrado_por ?? null
     )
     return NextResponse.json({ movimiento })
   } catch (err) {
