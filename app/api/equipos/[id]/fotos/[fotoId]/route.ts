@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server"
-import { findEquipoInAllBases, eliminarFotoEquipo } from "@/lib/data"
+import { findEquipoInAllBases, getFotoEquipoUrl, eliminarFotoEquipo } from "@/lib/data"
 import { isEmpresaAllowedForRequest } from "@/lib/db"
 import { userCanWrite } from "@/lib/auth-roles"
+import { apiError } from "@/lib/api-error"
+import { removeStoredFoto } from "@/lib/supabase"
 
 export async function DELETE(
   _request: Request,
@@ -21,9 +23,17 @@ export async function DELETE(
     return NextResponse.json({ error: "No tienes acceso a esta empresa" }, { status: 403 })
   }
   try {
-    await eliminarFotoEquipo(found.pool, fotoId)
+    const url = await getFotoEquipoUrl(found.pool, fotoId, found.equipo.id)
+    if (!url) {
+      return NextResponse.json({ error: "Foto no encontrada" }, { status: 404 })
+    }
+    await removeStoredFoto(url)
+    const deleted = await eliminarFotoEquipo(found.pool, fotoId, found.equipo.id)
+    if (!deleted) {
+      return NextResponse.json({ error: "Foto no encontrada" }, { status: 404 })
+    }
     return NextResponse.json({ ok: true })
-  } catch {
-    return NextResponse.json({ error: "Error al eliminar" }, { status: 400 })
+  } catch (err) {
+    return apiError(err, "Error al eliminar la foto", 500)
   }
 }

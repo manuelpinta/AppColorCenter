@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { auth0 } from "@/lib/auth0"
 import { getPool, isEmpresaAllowedForRequest } from "@/lib/db"
 import { userCanWrite } from "@/lib/auth-roles"
+import { apiError } from "@/lib/api-error"
 import { crearMantenimiento, getOrCreateUsuarioFromAuth0, parseEquipoId } from "@/lib/data"
 import type { Mantenimiento } from "@/lib/types"
 
@@ -103,7 +104,6 @@ export async function POST(request: NextRequest) {
       mantenimiento: { ...mantenimiento, id: `${empresaId}-${mantenimiento.id}` },
     })
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Error al crear mantenimiento"
-    return NextResponse.json({ error: message }, { status: 400 })
+    return apiError(err, "Error al crear mantenimiento", 400)
   }
 }

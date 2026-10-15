@@ -1,17 +1,16 @@
 import type { Pool } from "mysql2/promise"
 import type { Equipo } from "@/lib/types"
-import { getPool, getEmpresaIdsForDataLayer, EMPRESA_IDS, clearPool } from "@/lib/db"
+import { ClientError } from "@/lib/client-error"
+import { getPool, getEmpresaIdsForDataLayer, getEmpresaIdsToSearch, EMPRESA_IDS, clearPool } from "@/lib/db"
 import type { EmpresaId } from "@/lib/db"
 import { buildEquipoCompositeId as buildEquipoCompositeIdImpl, parseEquipoId as parseEquipoIdImpl } from "./ids"
 import { timed, withTimeout, getEmpresaQueryTimeoutMs } from "./timing"
-import { getCachedIf } from "./cache"
+import { getCachedIf, cacheKeyForEmpresas } from "./cache"
 
-export class EquipoValidationError extends Error {
-  field: string
+export class EquipoValidationError extends ClientError {
   constructor(field: string, message: string) {
-    super(message)
+    super(message, 400, field)
     this.name = "EquipoValidationError"
-    this.field = field
   }
 }
 
@@ -176,8 +175,7 @@ export const parseEquipoId = parseEquipoIdImpl
 export type { EquipoWithEmpresa } from "@/lib/types"
 
 /** Lista equipos de todas las bases (sin cache). Timeout por empresa; reintento por empresa si ECONNRESET. Si hubo timeout, no cachear. */
-async function getEquiposAllBasesUncached(): Promise<{ data: EquipoWithEmpresa[]; shouldCache: boolean }> {
-  const ids = await getEmpresaIdsForDataLayer()
+async function getEquiposAllBasesUncached(ids: EmpresaId[]): Promise<{ data: EquipoWithEmpresa[]; shouldCache: boolean }> {
   const timeoutMs = getEmpresaQueryTimeoutMs()
   let hadTimeout = false
   const arrays = await Promise.all(
@@ -233,7 +231,8 @@ export async function getEquiposByEmpresa(empresaId: EmpresaId): Promise<EquipoW
 
 /** Lista equipos de todas las bases con id compuesto y empresa_id. Cache corto solo cuando todas las empresas respondieron. */
 export async function getEquiposAllBases(): Promise<EquipoWithEmpresa[]> {
-  return getCachedIf("equiposAllBases", getEquiposAllBasesUncached)
+  const ids = await getEmpresaIdsForDataLayer()
+  return getCachedIf(cacheKeyForEmpresas("equiposAllBases", ids), () => getEquiposAllBasesUncached(ids))
 }
 
 /** Busca un equipo por id en todas las bases. Acepta id numérico o compuesto (emp-1-42). */
@@ -241,7 +240,7 @@ export async function findEquipoInAllBases(
   equipoId: string
 ): Promise<{ equipo: Equipo; pool: Pool; empresaId: EmpresaId } | null> {
   const { empresaId: onlyEmpresa, numericId } = parseEquipoId(equipoId)
-  const idsToTry = onlyEmpresa ? [onlyEmpresa] : await getEmpresaIdsForDataLayer()
+  const idsToTry = await getEmpresaIdsToSearch(onlyEmpresa)
   for (const empresaId of idsToTry) {
     const pool = await getPool(empresaId)
     const equipo = await getEquipoById(pool, numericId)
@@ -261,7 +260,7 @@ export async function actualizarEquipo(
   }
 ): Promise<Equipo> {
   const equipo = await getEquipoById(pool, equipoId)
-  if (!equipo) throw new Error("Equipo no encontrado")
+  if (!equipo) throw new ClientError("Equipo no encontrado")
 
   const updates: string[] = []
   const values: unknown[] = []
@@ -391,11 +390,11 @@ export async function crearEquipo(
 
   const [er] = await pool.query<{ id: number }[]>("SELECT id FROM cat_estados_equipo WHERE nombre = ?", [data.estado])
   const estado_id = Array.isArray(er) && er[0] ? er[0].id : null
-  if (estado_id == null) throw new Error("Estado de equipo no encontrado")
+  if (estado_id == null) throw new ClientError("Estado de equipo no encontrado")
 
   const [pr] = await pool.query<{ id: number }[]>("SELECT id FROM cat_tipos_propiedad WHERE nombre = ?", [data.tipo_propiedad])
   const tipo_propiedad_id = Array.isArray(pr) && pr[0] ? pr[0].id : null
-  if (tipo_propiedad_id == null) throw new Error("Tipo de propiedad no encontrado")
+  if (tipo_propiedad_id == null) throw new ClientError("Tipo de propiedad no encontrado")
 
   const marca_id = await resolveMarcaId(pool, { marca: data.marca ?? null, marca_id: data.marca_id ?? null })
   await ensureMarcaTipo(pool, marca_id, tipo_equipo_id)

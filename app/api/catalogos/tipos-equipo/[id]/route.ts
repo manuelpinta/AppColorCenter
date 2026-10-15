@@ -3,6 +3,7 @@ import { getPool, getCatalogoMaestroEmpresaId, isEmpresaAllowedForRequest } from
 import { actualizarTipoEquipo, getTipoEquipoById } from "@/lib/data/catalogos"
 import { updateCatTipoEquipoInOtrasBases } from "@/lib/data/catalogos-sync"
 import { userHasRole } from "@/lib/auth-roles"
+import { apiError } from "@/lib/api-error"
 
 /** Actualiza un tipo de equipo en el maestro y replica. Body: { nombre?: string, activo?: number } (activo 0 o 1). */
 export async function PATCH(
@@ -45,10 +46,6 @@ export async function PATCH(
     await updateCatTipoEquipoInOtrasBases(Number(id), row.nombre, row.activo)
     return NextResponse.json(row)
   } catch (err) {
-    console.error("PATCH /api/catalogos/tipos-equipo/[id]", err)
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Error al actualizar tipo" },
-      { status: 500 }
-    )
+    return apiError(err, "Error al actualizar tipo")
   }
 }

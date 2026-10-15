@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { auth0 } from "@/lib/auth0"
 import { userCanWrite } from "@/lib/auth-roles"
+import { apiError } from "@/lib/api-error"
 import { isEmpresaAllowedForRequest } from "@/lib/db"
 import { actualizarMantenimiento, findMantenimientoInAllBases, getOrCreateUsuarioFromAuth0 } from "@/lib/data"
 import type { Mantenimiento } from "@/lib/types"
@@ -87,7 +88,6 @@ export async function PATCH(
       mantenimiento: { ...mantenimiento, id: `${found.empresaId}-${mantenimiento.id}` },
     })
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Error al actualizar mantenimiento"
-    return NextResponse.json({ error: message }, { status: 400 })
+    return apiError(err, "Error al actualizar mantenimiento", 400)
   }
 }

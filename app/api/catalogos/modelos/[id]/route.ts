@@ -3,6 +3,7 @@ import { getPool, getCatalogoMaestroEmpresaId, isEmpresaAllowedForRequest } from
 import { actualizarModelo, getModeloById } from "@/lib/data/catalogos"
 import { updateModeloInOtrasBases } from "@/lib/data/catalogos-sync"
 import { userHasRole } from "@/lib/auth-roles"
+import { apiError } from "@/lib/api-error"
 
 /** Actualiza un modelo en el maestro y replica. Body: { nombre?: string, marca_id?: string, activo?: number }. */
 export async function PATCH(
@@ -51,10 +52,6 @@ export async function PATCH(
     )
     return NextResponse.json(row)
   } catch (err) {
-    console.error("PATCH /api/catalogos/modelos/[id]", err)
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Error al actualizar modelo" },
-      { status: 500 }
-    )
+    return apiError(err, "Error al actualizar modelo")
   }
 }

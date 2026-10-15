@@ -49,6 +49,28 @@ export async function crearFotoMantenimiento(
   return mapFotoRow(row)
 }
 
-export async function eliminarFotoMantenimiento(pool: Pool, fotoId: string): Promise<void> {
-  await pool.query("DELETE FROM mantenimiento_fotos WHERE id = ?", [Number(fotoId)])
+export async function getFotoMantenimientoUrl(
+  pool: Pool,
+  fotoId: string,
+  mantenimientoId: string
+): Promise<string | null> {
+  const [rows] = await pool.query<{ url: string }[]>(
+    "SELECT url FROM mantenimiento_fotos WHERE id = ? AND mantenimiento_id = ?",
+    [Number(fotoId), Number(mantenimientoId)]
+  )
+  const row = Array.isArray(rows) ? rows[0] : undefined
+  return row?.url ?? null
+}
+
+/** Borra la foto solo si pertenece a ese mantenimiento. */
+export async function eliminarFotoMantenimiento(
+  pool: Pool,
+  fotoId: string,
+  mantenimientoId: string
+): Promise<boolean> {
+  const [result] = await pool.query(
+    "DELETE FROM mantenimiento_fotos WHERE id = ? AND mantenimiento_id = ?",
+    [Number(fotoId), Number(mantenimientoId)]
+  )
+  return ((result as { affectedRows?: number }).affectedRows ?? 0) > 0
 }

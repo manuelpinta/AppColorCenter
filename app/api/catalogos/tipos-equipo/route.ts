@@ -3,8 +3,9 @@ import { getPool, getCatalogoMaestroEmpresaId, getEmpresaIdForCatalogRead, isEmp
 import { getCatalogoNombres, getTiposEquipoParaAdmin, crearTipoEquipo } from "@/lib/data/catalogos"
 import { syncCatTipoEquipoToOtrasBases } from "@/lib/data/catalogos-sync"
 import { userHasRole } from "@/lib/auth-roles"
+import { apiError } from "@/lib/api-error"
 
-/** Lista tipos de equipo. ?empresa_id=emp-1 para leer de esa empresa; ?incluir_inactivos=1 para admin. */
+/** Lista tipos de equipo. ?empresa_id=emp-1 para leer de esa empresa; ?incluir_inactivos=1 solo Soporte Central. */
 export async function GET(request: NextRequest) {
   try {
     const empresaId = getEmpresaIdForCatalogRead(request.nextUrl.searchParams.get("empresa_id"))
@@ -13,6 +14,9 @@ export async function GET(request: NextRequest) {
     }
     const pool = await getPool(empresaId)
     const incluirInactivos = request.nextUrl.searchParams.get("incluir_inactivos") === "1"
+    if (incluirInactivos && !(await userHasRole("soporte-central"))) {
+      return NextResponse.json({ error: "No tienes permisos para ver catálogos inactivos" }, { status: 403 })
+    }
     const items = incluirInactivos
       ? await getTiposEquipoParaAdmin(pool)
       : (await getCatalogoNombres(pool, "cat_tipos_equipo")).map((r) => ({
@@ -22,11 +26,7 @@ export async function GET(request: NextRequest) {
         }))
     return NextResponse.json(items)
   } catch (err) {
-    console.error("GET /api/catalogos/tipos-equipo", err)
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Error al listar tipos de equipo" },
-      { status: 500 }
-    )
+    return apiError(err, "Error al listar tipos de equipo")
   }
 }
 
@@ -56,10 +56,6 @@ export async function POST(request: NextRequest) {
     await syncCatTipoEquipoToOtrasBases(Number(created.id), created.nombre)
     return NextResponse.json(created)
   } catch (err) {
-    console.error("POST /api/catalogos/tipos-equipo", err)
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Error al crear tipo de equipo" },
-      { status: 500 }
-    )
+    return apiError(err, "Error al crear tipo de equipo")
   }
 }

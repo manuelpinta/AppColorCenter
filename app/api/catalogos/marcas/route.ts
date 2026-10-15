@@ -3,8 +3,9 @@ import { getPool, getCatalogoMaestroEmpresaId, getEmpresaIdForCatalogRead, isEmp
 import { getMarcasEquipo, getMarcasEquipoByTipo, getMarcasEquipoParaAdmin, crearMarca } from "@/lib/data/catalogos"
 import { syncMarcaToOtrasBases } from "@/lib/data/catalogos-sync"
 import { userHasRole } from "@/lib/auth-roles"
+import { apiError } from "@/lib/api-error"
 
-/** Lista marcas. ?empresa_id=emp-1 para leer de esa empresa (país/contexto); si no, maestro. ?incluir_inactivos=1 para admin. */
+/** Lista marcas. ?empresa_id=emp-1 para leer de esa empresa (país/contexto); si no, maestro. ?incluir_inactivos=1 solo Soporte Central. */
 export async function GET(request: NextRequest) {
   try {
     const empresaParam = request.nextUrl.searchParams.get("empresa_id")
@@ -14,6 +15,9 @@ export async function GET(request: NextRequest) {
     }
     const pool = await getPool(empresaId)
     const incluirInactivos = request.nextUrl.searchParams.get("incluir_inactivos") === "1"
+    if (incluirInactivos && !(await userHasRole("soporte-central"))) {
+      return NextResponse.json({ error: "No tienes permisos para ver catálogos inactivos" }, { status: 403 })
+    }
     const tipoEquipoId = request.nextUrl.searchParams.get("tipo_equipo_id")?.trim()
     const tipoEquipoNombre = request.nextUrl.searchParams.get("tipo_equipo")?.trim()
     const items = incluirInactivos
@@ -23,11 +27,7 @@ export async function GET(request: NextRequest) {
         : (await getMarcasEquipo(pool)).map((m) => ({ ...m, activo: 1 }))
     return NextResponse.json(items)
   } catch (err) {
-    console.error("GET /api/catalogos/marcas", err)
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Error al listar marcas" },
-      { status: 500 }
-    )
+    return apiError(err, "Error al listar marcas")
   }
 }
 
@@ -67,10 +67,6 @@ export async function POST(request: NextRequest) {
     )
     return NextResponse.json(created)
   } catch (err) {
-    console.error("POST /api/catalogos/marcas", err)
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Error al crear marca" },
-      { status: 500 }
-    )
+    return apiError(err, "Error al crear marca")
   }
 }

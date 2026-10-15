@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { syncAllMarcasFromMaster } from "@/lib/data/catalogos-sync"
 import { userHasRole } from "@/lib/auth-roles"
+import { apiError } from "@/lib/api-error"
 
 /** Re-sincroniza todas las marcas del maestro a todas las bases configuradas (incl. Honduras). */
 export async function POST() {
@@ -11,10 +12,6 @@ export async function POST() {
     const result = await syncAllMarcasFromMaster()
     return NextResponse.json({ ok: true, ...result })
   } catch (err) {
-    console.error("POST /api/catalogos/sync-marcas", err)
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Error al sincronizar marcas" },
-      { status: 500 }
-    )
+    return apiError(err, "Error al sincronizar marcas")
   }
 }

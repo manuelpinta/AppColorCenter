@@ -1,5 +1,6 @@
 import type { Pool } from "mysql2/promise"
 import type { MovimientoEquipo } from "@/lib/types"
+import { ClientError } from "@/lib/client-error"
 import { getEquipoById } from "./equipos"
 import { actualizarEquipo } from "./equipos"
 import { getOrCreateUsuarioByNombre, getNombreUsuarioById } from "./usuarios"
@@ -54,8 +55,8 @@ export async function registrarMovimientoEquipo(
   registradoPor: string | null = null
 ): Promise<MovimientoEquipo> {
   const equipo = await getEquipoById(pool, equipoId)
-  if (!equipo) throw new Error("Equipo no encontrado")
-  if (sucursalDestinoId === equipo.color_center_id) throw new Error("El equipo ya está en esa sucursal")
+  if (!equipo) throw new ClientError("Equipo no encontrado")
+  if (sucursalDestinoId === equipo.color_center_id) throw new ClientError("El equipo ya está en esa sucursal")
 
   const sucursalOrigenId = equipo.color_center_id
   const fecha = new Date().toISOString().slice(0, 10)
