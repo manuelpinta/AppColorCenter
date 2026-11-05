@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { getPool, isEmpresaAllowedForRequest } from "@/lib/db"
 import { crearEquipo, buildEquipoCompositeId, actualizarComputadora } from "@/lib/data"
 import type { EmpresaId } from "@/lib/db"
-import { userCanWrite } from "@/lib/auth-roles"
+import { userCanEditNormatividadFields, userCanWrite } from "@/lib/auth-roles"
 import { apiError } from "@/lib/api-error"
 import { equipoCreateSchema, readBody } from "@/lib/api-schemas"
 
@@ -28,6 +28,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "No tienes acceso a esta empresa" }, { status: 403 })
   }
 
+  const canEditNormatividad = await userCanEditNormatividadFields()
+  const tipoPropiedad = canEditNormatividad ? data.tipo_propiedad : "Propio"
+  const arrendador = canEditNormatividad && tipoPropiedad === "Arrendado" ? (data.arrendador ?? null) : null
+  const fechaVencimiento =
+    canEditNormatividad && tipoPropiedad === "Arrendado" ? (data.fecha_vencimiento_arrendamiento ?? null) : null
+
   try {
     const pool = await getPool(empresaId)
     const equipo = await crearEquipo(pool, {
@@ -40,9 +46,9 @@ export async function POST(request: NextRequest) {
       modelo_id: data.modelo_id,
       numero_serie: data.numero_serie ?? null,
       fecha_compra: data.fecha_compra ?? null,
-      tipo_propiedad: data.tipo_propiedad,
-      arrendador: data.arrendador ?? null,
-      fecha_vencimiento_arrendamiento: data.fecha_vencimiento_arrendamiento ?? null,
+      tipo_propiedad: tipoPropiedad,
+      arrendador,
+      fecha_vencimiento_arrendamiento: fechaVencimiento,
       estado: data.estado,
       ultima_calibracion: data.ultima_calibracion ?? null,
       proxima_revision: data.proxima_revision ?? null,

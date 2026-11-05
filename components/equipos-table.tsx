@@ -16,6 +16,7 @@ interface EquiposTableProps {
   equipos: EquipoWithEmpresa[]
   colorCenters: ColorCenter[]
   canWrite: boolean
+  showLeasingInfo?: boolean
 }
 
 const PAGE_SIZE = 100
@@ -28,9 +29,7 @@ function getEquipoSucursalKey(eq: EquipoWithEmpresa): string {
   return eq.empresa_id ? `${eq.empresa_id}-${eq.color_center_id}` : eq.color_center_id
 }
 
-export function EquiposTable({ equipos, colorCenters, canWrite }: EquiposTableProps) {
-  // Temporal: ocultar datos de arrendamiento en listado de equipos.
-  const showLeasingInfo = false
+export function EquiposTable({ equipos, colorCenters, canWrite, showLeasingInfo = false }: EquiposTableProps) {
   const colorCenterMap = useMemo(
     () => new Map(colorCenters.map((cc) => [getColorCenterKey(cc), cc])),
     [colorCenters]

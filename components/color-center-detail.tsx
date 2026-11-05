@@ -26,6 +26,7 @@ interface ColorCenterDetailProps {
   /** Id a usar en enlaces (crear equipo, incidencia, etc.): compuesto o numérico. */
   sucursalIdForLinks: string
   canWrite: boolean
+  showLeasingInfo?: boolean
 }
 
 export function ColorCenterDetail({
@@ -35,10 +36,8 @@ export function ColorCenterDetail({
   incidencias,
   sucursalIdForLinks,
   canWrite,
+  showLeasingInfo = false,
 }: ColorCenterDetailProps) {
-  // Temporal: ocultar arrendamiento en detalle de sucursal.
-  // Cuando se defina el rol correspondiente, cambiar a `true`.
-  const showLeasingInfo = false
 
   const getEstadoBadgeColor = (estado: string) => {
     switch (estado) {

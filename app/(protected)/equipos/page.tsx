@@ -4,7 +4,7 @@ import Link from "next/link"
 import { EquiposContent } from "@/components/equipos-content"
 import { getEquiposAllBases, getColorCentersConCerradasAllBases } from "@/lib/data"
 import { timed } from "@/lib/data/timing"
-import { userCanWrite } from "@/lib/auth-roles"
+import { userCanEditNormatividadFields, userCanWrite } from "@/lib/auth-roles"
 
 export default async function EquiposPage() {
   const [equipos, colorCenters] = await timed("equipos page (getEquiposAllBases + getColorCentersConCerradasAllBases)", async () =>
@@ -13,7 +13,7 @@ export default async function EquiposPage() {
       timed("getColorCentersConCerradasAllBases", () => getColorCentersConCerradasAllBases()),
     ])
   )
-  const canWrite = await userCanWrite()
+  const [canWrite, showLeasingInfo] = await Promise.all([userCanWrite(), userCanEditNormatividadFields()])
   return (
     <div className="pb-20 lg:pb-0">
       <div className="px-4 py-6 lg:px-8 lg:py-8">
@@ -32,7 +32,7 @@ export default async function EquiposPage() {
           )}
         </div>
 
-        <EquiposContent equipos={equipos} colorCenters={colorCenters} canWrite={canWrite} />
+        <EquiposContent equipos={equipos} colorCenters={colorCenters} canWrite={canWrite} showLeasingInfo={showLeasingInfo} />
       </div>
     </div>
   )
