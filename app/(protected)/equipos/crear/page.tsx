@@ -1,4 +1,4 @@
-import { requireWrite } from "@/lib/auth-roles"
+import { requireWrite, userCanEditNormatividadFields } from "@/lib/auth-roles"
 import { EquipoForm } from "@/components/equipo-form"
 import { getColorCentersAllBases } from "@/lib/data"
 import { getEmpresasForCurrentUser } from "@/lib/data/empresas-auth"
@@ -10,9 +10,10 @@ export default async function NuevoEquipoPage({
 }) {
   await requireWrite("/equipos")
   const params = await searchParams
-  const [empresas, colorCenters] = await Promise.all([
+  const [empresas, colorCenters, showLeasingFields] = await Promise.all([
     getEmpresasForCurrentUser(),
     getColorCentersAllBases(),
+    userCanEditNormatividadFields(),
   ])
   return (
     <div className="px-4 py-6 pb-24 lg:pb-8 lg:px-8 lg:py-8 max-w-4xl mx-auto">
@@ -21,7 +22,12 @@ export default async function NuevoEquipoPage({
         <p className="text-sm lg:text-base text-muted-foreground mt-1.5">Completa la informacion del equipo</p>
       </div>
 
-      <EquipoForm empresas={empresas} colorCenters={colorCenters} defaultColorCenterId={params.color_center_id} />
+      <EquipoForm
+        empresas={empresas}
+        colorCenters={colorCenters}
+        defaultColorCenterId={params.color_center_id}
+        showLeasingFields={showLeasingFields}
+      />
     </div>
   )
 }

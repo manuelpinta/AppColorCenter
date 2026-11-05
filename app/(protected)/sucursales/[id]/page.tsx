@@ -7,7 +7,7 @@ import {
 } from "@/lib/data"
 import { ColorCenterDetail } from "@/components/color-center-detail"
 import type { EquipoWithEmpresa } from "@/lib/data"
-import { userCanWrite } from "@/lib/auth-roles"
+import { userCanEditNormatividadFields, userCanWrite } from "@/lib/auth-roles"
 
 export default async function ColorCenterDetailPage({
   params,
@@ -15,7 +15,7 @@ export default async function ColorCenterDetailPage({
   params: Promise<{ id: string }>
 }) {
   const { id } = await params
-  const canWrite = await userCanWrite()
+  const [canWrite, showLeasingInfo] = await Promise.all([userCanWrite(), userCanEditNormatividadFields()])
   const found = await getSucursalByCompositeId(id)
   if (!found) notFound()
   const { colorCenter, pool, empresaId } = found
@@ -41,6 +41,7 @@ export default async function ColorCenterDetailPage({
         incidencias={incidencias}
         sucursalIdForLinks={compositeSucursalId}
         canWrite={canWrite}
+        showLeasingInfo={showLeasingInfo}
       />
     </div>
   )

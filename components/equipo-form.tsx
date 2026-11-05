@@ -46,6 +46,8 @@ interface EquipoFormProps {
   equipoIdForLink?: string
   /** Si es true, solo permite editar datos de compra/arrendamiento. */
   normatividadMode?: boolean
+  /** Mostrar y editar propio/arrendado. Solo rol normatividad. */
+  showLeasingFields?: boolean
 }
 
 function getInitialEmpresaAndZona(
@@ -83,10 +85,10 @@ export function EquipoForm({
   empresaId: empresaIdProp,
   equipoIdForLink,
   normatividadMode = false,
+  showLeasingFields = false,
 }: EquipoFormProps) {
   const router = useRouter()
-  // Temporal: ocultar arrendamiento; se habilita para normatividad.
-  const showLeasingFields = normatividadMode
+  const showLeasing = showLeasingFields || normatividadMode
   const showCalibrationFields = false
   const isRestrictedEdit = Boolean(equipo && normatividadMode)
   const errorRef = useRef<HTMLDivElement>(null)
@@ -339,10 +341,14 @@ export function EquipoForm({
               modelo_id: Number(formData.modelo_id),
               numero_serie: isComputo ? null : formData.numero_serie || null,
               fecha_compra: isComputo ? null : formData.fecha_compra || null,
-              tipo_propiedad: formData.tipo_propiedad,
-              arrendador: formData.tipo_propiedad === "Arrendado" ? arrendadorNombre : null,
-              fecha_vencimiento_arrendamiento:
-                formData.tipo_propiedad === "Arrendado" ? formData.fecha_vencimiento_arrendamiento || null : null,
+              ...(showLeasing
+                ? {
+                    tipo_propiedad: formData.tipo_propiedad,
+                    arrendador: formData.tipo_propiedad === "Arrendado" ? arrendadorNombre : null,
+                    fecha_vencimiento_arrendamiento:
+                      formData.tipo_propiedad === "Arrendado" ? formData.fecha_vencimiento_arrendamiento || null : null,
+                  }
+                : {}),
               estado: formData.estado,
               ultima_calibracion: isComputo ? null : formData.ultima_calibracion || null,
               proxima_revision: isComputo ? null : formData.proxima_revision || null,
@@ -383,10 +389,10 @@ export function EquipoForm({
         modelo_id: Number(formData.modelo_id),
         numero_serie: isComputo ? null : formData.numero_serie || null,
         fecha_compra: isComputo ? null : formData.fecha_compra || null,
-        tipo_propiedad: formData.tipo_propiedad,
-        arrendador: formData.tipo_propiedad === "Arrendado" ? arrendadorNombre : null,
+        tipo_propiedad: showLeasing ? formData.tipo_propiedad : "Propio",
+        arrendador: showLeasing && formData.tipo_propiedad === "Arrendado" ? arrendadorNombre : null,
         fecha_vencimiento_arrendamiento:
-          formData.tipo_propiedad === "Arrendado" ? formData.fecha_vencimiento_arrendamiento || null : null,
+          showLeasing && formData.tipo_propiedad === "Arrendado" ? formData.fecha_vencimiento_arrendamiento || null : null,
         estado: formData.estado,
         ultima_calibracion: isComputo ? null : formData.ultima_calibracion || null,
         proxima_revision: isComputo ? null : formData.proxima_revision || null,
@@ -446,7 +452,9 @@ export function EquipoForm({
         </CardHeader>
         <CardContent className="space-y-4 lg:space-y-6">
           <p className="text-sm text-muted-foreground">
-            <strong className="text-foreground">Obligatorios:</strong> Empresa, Sucursal, Tipo de equipo, Marca, Modelo y Estado.
+            {isRestrictedEdit
+              ? "Solo puedes cambiar si el equipo es propio o arrendado, el arrendador y la fecha de vencimiento."
+              : "Obligatorios: Empresa, Sucursal, Tipo de equipo, Marca, Modelo y Estado."}
           </p>
           {error && (
             <div
@@ -634,7 +642,7 @@ export function EquipoForm({
                   onChange={(e) => setFormData({ ...formData, fecha_compra: e.target.value })}
                 />
               </div>
-              {showLeasingFields && (
+              {showLeasing && (
                 <div className="space-y-4">
                   <div className="space-y-2">
                     <Label htmlFor="tipo_propiedad">Propiedad del equipo</Label>

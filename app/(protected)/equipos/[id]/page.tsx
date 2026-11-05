@@ -43,8 +43,7 @@ export default async function EquipoDetailPage({ params }: { params: Promise<{ i
     userCanEditNormatividadFields(),
   ])
   const canEditEquipoFields = canWrite || canEditNormatividad
-  // Temporal: ocultar datos de arrendamiento y calibracion/revision en UI.
-  const showLeasingInfo = false
+  const showLeasingInfo = canEditNormatividad
   const showCalibrationInfo = false
 
   const found = await findEquipoInAllBases(id)
@@ -233,18 +232,19 @@ export default async function EquipoDetailPage({ params }: { params: Promise<{ i
                   </div>
                 </div>
 
+                {showLeasingInfo && (
                 <div className="flex items-start gap-3">
                   <User className="h-5 w-5 text-primary/60 mt-0.5" />
                   <div>
                     <p className="text-sm text-muted-foreground">Propiedad</p>
                     <p className="font-medium">
-                      {showLeasingInfo
-                        ? equipo.tipo_propiedad === "Arrendado" && equipo.arrendador
-                          ? `En arrendamiento - ${equipo.arrendador}`
-                          : "Propiedad nuestra"
-                        : equipo.tipo_propiedad}
+                      {equipo.tipo_propiedad === "Arrendado" && equipo.arrendador
+                        ? `En arrendamiento - ${equipo.arrendador}`
+                        : equipo.tipo_propiedad === "Arrendado"
+                          ? "En arrendamiento"
+                          : "Propiedad nuestra"}
                     </p>
-                    {showLeasingInfo && equipo.tipo_propiedad === "Arrendado" && equipo.fecha_vencimiento_arrendamiento && (
+                    {equipo.tipo_propiedad === "Arrendado" && equipo.fecha_vencimiento_arrendamiento && (
                       <div className="mt-2 flex flex-wrap items-center gap-2">
                         <span className="text-sm text-muted-foreground">
                           Vencimiento contrato:{" "}
@@ -276,6 +276,7 @@ export default async function EquipoDetailPage({ params }: { params: Promise<{ i
                     )}
                   </div>
                 </div>
+                )}
               </CardContent>
             </Card>
 

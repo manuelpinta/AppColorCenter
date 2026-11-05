@@ -19,11 +19,12 @@ interface EquiposContentProps {
   equipos: EquipoWithEmpresa[]
   colorCenters: ColorCenter[]
   canWrite: boolean
+  showLeasingInfo?: boolean
 }
 
 const DIAS_POR_VENCER = 90
 
-export function EquiposContent({ equipos, colorCenters, canWrite }: EquiposContentProps) {
+export function EquiposContent({ equipos, colorCenters, canWrite, showLeasingInfo = false }: EquiposContentProps) {
   const [search, setSearch] = useState("")
   const [sucursalId, setSucursalId] = useState("all")
   const [propiedad, setPropiedad] = useState<"all" | "Propio" | "Arrendado">("all")
@@ -51,8 +52,9 @@ export function EquiposContent({ equipos, colorCenters, canWrite }: EquiposConte
         (eq.empresa_id &&
           eq.color_center_id &&
           buildSucursalCompositeIdFromIds(eq.empresa_id as EmpresaId, eq.color_center_id) === sucursalId)
-      const matchPropiedad = propiedad === "all" || eq.tipo_propiedad === propiedad
+      const matchPropiedad = !showLeasingInfo || propiedad === "all" || eq.tipo_propiedad === propiedad
       const matchPorVencer =
+        !showLeasingInfo ||
         !soloPorVencer ||
         (eq.tipo_propiedad === "Arrendado" &&
           eq.fecha_vencimiento_arrendamiento != null && (() => {
@@ -61,12 +63,12 @@ export function EquiposContent({ equipos, colorCenters, canWrite }: EquiposConte
           })())
       return matchSearch && matchSucursal && matchPropiedad && matchPorVencer
     })
-  }, [equipos, ccIndex, search, sucursalId, propiedad, soloPorVencer])
+  }, [equipos, ccIndex, search, sucursalId, propiedad, soloPorVencer, showLeasingInfo])
   const activeFilters = [
     search.trim() ? `Busqueda: ${search.trim()}` : null,
     sucursalId !== "all" ? "Sucursal" : null,
-    propiedad !== "all" ? `Propiedad: ${propiedad}` : null,
-    soloPorVencer ? "Por vencer" : null,
+    showLeasingInfo && propiedad !== "all" ? `Propiedad: ${propiedad}` : null,
+    showLeasingInfo && soloPorVencer ? "Por vencer" : null,
   ].filter(Boolean) as string[]
   const clearFilters = () => {
     setSearch("")
@@ -115,35 +117,39 @@ export function EquiposContent({ equipos, colorCenters, canWrite }: EquiposConte
               colorCenters={colorCenters}
               triggerClassName="w-full sm:w-auto sm:min-w-[200px] min-h-[44px] sm:min-h-[40px]"
             />
-            <Select value={propiedad} onValueChange={(v) => setPropiedad(v as "all" | "Propio" | "Arrendado")}>
-              <SelectTrigger className="w-full sm:w-auto sm:min-w-[200px] h-10 min-h-[44px] sm:min-h-0">
-                <SelectValue placeholder="Propiedad" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos (propiedad)</SelectItem>
-                <SelectItem value="Propio">Propio</SelectItem>
-                <SelectItem value="Arrendado">En arrendamiento</SelectItem>
-              </SelectContent>
-            </Select>
-            <div className="flex items-center gap-2 min-h-[44px] sm:min-h-0 h-10 px-3 rounded-md border bg-background min-w-[200px] touch-manipulation">
-              <Checkbox
-                id="solo-por-vencer"
-                checked={soloPorVencer}
-                onCheckedChange={(c) => setSoloPorVencer(!!c)}
-              />
-              <label
-                htmlFor="solo-por-vencer"
-                className="text-sm cursor-pointer flex items-center gap-1.5"
-              >
-                <CalendarClock className="h-4 w-4 text-muted-foreground" />
-                Por vencer ({DIAS_POR_VENCER} días)
-              </label>
-            </div>
+            {showLeasingInfo && (
+              <>
+                <Select value={propiedad} onValueChange={(v) => setPropiedad(v as "all" | "Propio" | "Arrendado")}>
+                  <SelectTrigger className="w-full sm:w-auto sm:min-w-[200px] h-10 min-h-[44px] sm:min-h-0">
+                    <SelectValue placeholder="Propiedad" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos (propiedad)</SelectItem>
+                    <SelectItem value="Propio">Propio</SelectItem>
+                    <SelectItem value="Arrendado">En arrendamiento</SelectItem>
+                  </SelectContent>
+                </Select>
+                <div className="flex items-center gap-2 min-h-[44px] sm:min-h-0 h-10 px-3 rounded-md border bg-background min-w-[200px] touch-manipulation">
+                  <Checkbox
+                    id="solo-por-vencer"
+                    checked={soloPorVencer}
+                    onCheckedChange={(c) => setSoloPorVencer(!!c)}
+                  />
+                  <label
+                    htmlFor="solo-por-vencer"
+                    className="text-sm cursor-pointer flex items-center gap-1.5"
+                  >
+                    <CalendarClock className="h-4 w-4 text-muted-foreground" />
+                    Por vencer ({DIAS_POR_VENCER} días)
+                  </label>
+                </div>
+              </>
+            )}
           </div>
         </div>
       </CardHeader>
       <CardContent>
-        <EquiposTable equipos={filteredEquipos} colorCenters={colorCenters} canWrite={canWrite} />
+        <EquiposTable equipos={filteredEquipos} colorCenters={colorCenters} canWrite={canWrite} showLeasingInfo={showLeasingInfo} />
       </CardContent>
     </Card>
   )
