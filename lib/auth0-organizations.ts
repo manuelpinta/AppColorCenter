@@ -18,6 +18,8 @@ interface Auth0Role {
 /**
  * Mapeo nombre de Organization en Auth0 → EmpresaId.
  * Case-insensitive; "Pintacomex" y "Pinta" → emp-1.
+ * La org `spi` no es una empresa: en el mismo tenant significa todas
+ * (claim companies = "*"). Quien entra con esa org ve las cinco.
  */
 const ORG_NAME_TO_EMPRESA: Record<string, EmpresaId> = {
   pinta: "emp-1",
@@ -27,6 +29,9 @@ const ORG_NAME_TO_EMPRESA: Record<string, EmpresaId> = {
   salvador: "emp-4",
   honduras: "emp-5",
 }
+
+/** Org de Auth0 que en el tenant equivale a todas las empresas. */
+const UNRESTRICTED_ORG_NAMES = new Set(["spi", "*"])
 
 function normalizeOrgName(name: string): string {
   return name.trim().toLowerCase().replace(/\s+/g, "")
@@ -167,6 +172,11 @@ export async function getUserRolesFromManagementAPI(userId: string): Promise<str
  */
 /** Orden determinista para evitar hydration mismatch (mismo orden servidor/cliente). */
 export function mapOrganizationsToEmpresaIds(orgs: Auth0Organization[]): EmpresaId[] {
+  for (const org of orgs) {
+    if (UNRESTRICTED_ORG_NAMES.has(normalizeOrgName(org.name))) {
+      return [...EMPRESA_IDS]
+    }
+  }
   const set = new Set<EmpresaId>()
   for (const org of orgs) {
     const eid = mapOrgToEmpresaId(org)
