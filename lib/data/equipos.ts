@@ -5,7 +5,7 @@ import { getPool, getEmpresaIdsForDataLayer, getEmpresaIdsToSearch, EMPRESA_IDS,
 import type { EmpresaId } from "@/lib/db"
 import { buildEquipoCompositeId as buildEquipoCompositeIdImpl, parseEquipoId as parseEquipoIdImpl } from "./ids"
 import { timed, withTimeout, getEmpresaQueryTimeoutMs } from "./timing"
-import { getCachedIf, cacheKeyForEmpresas } from "./cache"
+import { getCachedIf, cacheKeyForEmpresas, invalidateCachedList } from "./cache"
 
 export class EquipoValidationError extends ClientError {
   constructor(field: string, message: string) {
@@ -374,6 +374,7 @@ export async function actualizarEquipo(
   if (updates.length === 0) return equipo
   values.push(equipoId)
   await pool.query(`UPDATE equipos SET ${updates.join(", ")} WHERE id = ?`, values)
+  invalidateCachedList("equiposAllBases")
   const updated = await getEquipoById(pool, equipoId)
   return updated ?? equipo
 }
@@ -436,6 +437,7 @@ export async function crearEquipo(
     ]
   )
   const insertId = (result as unknown as { insertId: number }).insertId
+  invalidateCachedList("equiposAllBases")
   const equipo = await getEquipoById(pool, String(insertId))
   if (!equipo) throw new Error("No se pudo leer el equipo creado")
   return equipo

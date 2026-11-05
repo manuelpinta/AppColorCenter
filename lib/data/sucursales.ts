@@ -14,7 +14,7 @@ import {
 } from "@/lib/db"
 import { parseSucursalId } from "./ids"
 import { timed, withTimeout, getEmpresaQueryTimeoutMs } from "./timing"
-import { getCachedIf, cacheKeyForEmpresas } from "./cache"
+import { getCached, getCachedIf, cacheKeyForEmpresas } from "./cache"
 
 /** Convierte fila de sucursales + JOINs a ColorCenter con empresa_id de la app. */
 function mapSucursalRow(row: Record<string, unknown>, empresaId: string): ColorCenter {
@@ -152,6 +152,10 @@ async function getSucursalesFromComun(empresaId: EmpresaId): Promise<ColorCenter
  * Si no, usa la base Color Center (tabla sucursales con JOINs).
  */
 export async function getSucursalesByEmpresa(empresaId: EmpresaId): Promise<ColorCenter[]> {
+  return getCached(`sucursalesByEmpresa:${empresaId}`, () => getSucursalesByEmpresaUncached(empresaId))
+}
+
+async function getSucursalesByEmpresaUncached(empresaId: EmpresaId): Promise<ColorCenter[]> {
   if (hasComunForEmpresa(empresaId)) {
     return getSucursalesFromComun(empresaId)
   }
@@ -355,8 +359,10 @@ export async function getSucursalByCompositeId(
   const { empresaId: onlyEmpresa, numericId } = parseSucursalId(id)
   const idsToTry = await getEmpresaIdsToSearch(onlyEmpresa)
   for (const empresaId of idsToTry) {
-    const list = await getSucursalesByEmpresaConCerradas(empresaId)
-    const colorCenter = list.find((c) => c.id === numericId)
+    const activas = await getSucursalesByEmpresa(empresaId)
+    const colorCenter =
+      activas.find((c) => c.id === numericId) ??
+      (await getSucursalesCerradasConRegistros(empresaId, activas)).find((c) => c.id === numericId)
     if (colorCenter) {
       const pool = await getPool(empresaId)
       return { colorCenter, pool, empresaId }

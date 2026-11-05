@@ -44,8 +44,30 @@ function mapOrgToEmpresaId(org: Auth0Organization): EmpresaId | null {
   return null
 }
 
-/** Obtiene access token para Auth0 Management API (client credentials). */
+/** Margen antes de que expire el token para pedir uno nuevo. */
+const TOKEN_REFRESH_MARGIN_MS = 60_000
+
+let cachedToken: { value: string; expiresAt: number } | null = null
+let tokenInFlight: Promise<string> | null = null
+
+/** Token de Management API, reutilizado mientras no expire (Auth0 lo emite por ~24 h). */
 async function getManagementApiToken(): Promise<string> {
+  if (cachedToken && cachedToken.expiresAt > Date.now()) return cachedToken.value
+  if (!tokenInFlight) {
+    tokenInFlight = fetchManagementApiToken()
+      .then(({ token, expiresInSec }) => {
+        cachedToken = { value: token, expiresAt: Date.now() + expiresInSec * 1000 - TOKEN_REFRESH_MARGIN_MS }
+        return token
+      })
+      .finally(() => {
+        tokenInFlight = null
+      })
+  }
+  return tokenInFlight
+}
+
+/** Pide un access token para Auth0 Management API (client credentials). */
+async function fetchManagementApiToken(): Promise<{ token: string; expiresInSec: number }> {
   const domain = process.env.AUTH0_DOMAIN
   const clientId = process.env.AUTH0_M2M_CLIENT_ID ?? process.env.AUTH0_CLIENT_ID
   const clientSecret = process.env.AUTH0_M2M_CLIENT_SECRET ?? process.env.AUTH0_CLIENT_SECRET
@@ -81,9 +103,9 @@ async function getManagementApiToken(): Promise<string> {
       throw new Error(`Auth0 Management API token failed: ${res.status} ${text}`)
     }
 
-    const data = (await res.json()) as { access_token?: string }
+    const data = (await res.json()) as { access_token?: string; expires_in?: number }
     if (!data.access_token) throw new Error("Auth0 token response missing access_token")
-    return data.access_token
+    return { token: data.access_token, expiresInSec: Number(data.expires_in) || 3600 }
   } catch (err) {
     // eslint-disable-next-line no-console
     console.error("[auth0-organizations] Management token fetch failed", err)
@@ -93,13 +115,25 @@ async function getManagementApiToken(): Promise<string> {
   }
 }
 
+/** Cambios de membresía en Auth0 tardan hasta este tiempo en reflejarse. */
+const ORGS_CACHE_TTL_MS = Number(process.env.AUTH0_ORGS_CACHE_TTL_MS) || 5 * 60_000
+
+const orgsCache = new Map<string, { orgs: Auth0Organization[]; expires: number }>()
+
 /**
- * Devuelve las organizaciones a las que pertenece el usuario (Auth0 Management API).
+ * Devuelve las organizaciones a las que pertenece el usuario (Auth0 Management API), con cache por usuario.
  * Requiere M2M app con scope read:organization_memberships (y read:organizations para nombres).
  */
 export async function getUserOrganizations(userId: string): Promise<Auth0Organization[]> {
   if (!AUTH0_ORGANIZATIONS_ENABLED) return []
+  const hit = orgsCache.get(userId)
+  if (hit && hit.expires > Date.now()) return hit.orgs
+  const orgs = await fetchUserOrganizations(userId)
+  orgsCache.set(userId, { orgs, expires: Date.now() + ORGS_CACHE_TTL_MS })
+  return orgs
+}
 
+async function fetchUserOrganizations(userId: string): Promise<Auth0Organization[]> {
   const domain = process.env.AUTH0_DOMAIN
   if (!domain) return []
 
@@ -116,6 +150,7 @@ export async function getUserOrganizations(userId: string): Promise<Auth0Organiz
 
     if (res.status === 404) return []
     if (!res.ok) {
+      if (res.status === 401) cachedToken = null
       const text = await res.text()
       throw new Error(`Auth0 getUserOrganizations failed: ${res.status} ${text}`)
     }
@@ -153,6 +188,7 @@ export async function getUserRolesFromManagementAPI(userId: string): Promise<str
     })
 
     if (!res.ok) {
+      if (res.status === 401) cachedToken = null
       // eslint-disable-next-line no-console
       console.error("[auth0-organizations] getUserRolesFromManagementAPI failed", res.status)
       const text = await res.text().catch(() => "")

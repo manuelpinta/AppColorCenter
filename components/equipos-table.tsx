@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import type { Equipo, ColorCenter } from "@/lib/types"
 import type { EquipoWithEmpresa } from "@/lib/types"
 import { Badge } from "@/components/ui/badge"
@@ -18,6 +18,8 @@ interface EquiposTableProps {
   canWrite: boolean
 }
 
+const PAGE_SIZE = 100
+
 function getColorCenterKey(cc: ColorCenter): string {
   return cc.empresa_id ? `${cc.empresa_id}-${cc.id}` : cc.id
 }
@@ -29,7 +31,11 @@ function getEquipoSucursalKey(eq: EquipoWithEmpresa): string {
 export function EquiposTable({ equipos, colorCenters, canWrite }: EquiposTableProps) {
   // Temporal: ocultar datos de arrendamiento en listado de equipos.
   const showLeasingInfo = false
-  const colorCenterMap = new Map(colorCenters.map((cc) => [getColorCenterKey(cc), cc]))
+  const colorCenterMap = useMemo(
+    () => new Map(colorCenters.map((cc) => [getColorCenterKey(cc), cc])),
+    [colorCenters]
+  )
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
 
   const [filterTipo, setFilterTipo] = useState<Set<string> | null>(null)
   const [filterEstado, setFilterEstado] = useState<Set<string> | null>(null)
@@ -88,6 +94,13 @@ export function EquiposTable({ equipos, colorCenters, canWrite }: EquiposTablePr
       return sortOrder === "asc" ? cmp : -cmp
     })
   }, [filteredEquipos, sortBy, sortOrder, colorCenterMap])
+
+  useEffect(() => {
+    setVisibleCount(PAGE_SIZE)
+  }, [filteredEquipos])
+
+  const visibleEquipos = useMemo(() => sortedEquipos.slice(0, visibleCount), [sortedEquipos, visibleCount])
+  const remaining = sortedEquipos.length - visibleEquipos.length
 
   const getEstadoBadge = (estado: string) => {
     switch (estado) {
@@ -154,7 +167,7 @@ export function EquiposTable({ equipos, colorCenters, canWrite }: EquiposTablePr
     <>
       {/* Móvil: lista en cards */}
       <div className="md:hidden space-y-2">
-        {sortedEquipos.map((equipo) => {
+        {visibleEquipos.map((equipo) => {
           const colorCenter = colorCenterMap.get(getEquipoSucursalKey(equipo))
           const venc = showLeasingInfo && equipo.tipo_propiedad === "Arrendado" && equipo.fecha_vencimiento_arrendamiento
           const vencDate = venc ? new Date(equipo.fecha_vencimiento_arrendamiento!) : null
@@ -240,7 +253,7 @@ export function EquiposTable({ equipos, colorCenters, canWrite }: EquiposTablePr
             </tr>
           </thead>
           <tbody>
-            {sortedEquipos.map((equipo) => {
+            {visibleEquipos.map((equipo) => {
               const colorCenter = colorCenterMap.get(getEquipoSucursalKey(equipo))
               const venc = showLeasingInfo && equipo.tipo_propiedad === "Arrendado" && equipo.fecha_vencimiento_arrendamiento
               const vencDate = venc ? new Date(equipo.fecha_vencimiento_arrendamiento!) : null
@@ -292,6 +305,17 @@ export function EquiposTable({ equipos, colorCenters, canWrite }: EquiposTablePr
           </tbody>
         </table>
       </div>
+
+      {remaining > 0 && (
+        <div className="mt-4 flex flex-col items-center gap-1">
+          <Button variant="outline" onClick={() => setVisibleCount((n) => n + PAGE_SIZE)} className="min-h-[44px]">
+            Mostrar {Math.min(PAGE_SIZE, remaining)} más
+          </Button>
+          <p className="text-xs text-muted-foreground">
+            Mostrando {visibleEquipos.length} de {sortedEquipos.length}
+          </p>
+        </div>
+      )}
     </>
   )
 }

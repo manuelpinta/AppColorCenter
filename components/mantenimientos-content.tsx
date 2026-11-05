@@ -7,21 +7,13 @@ import { Search } from "lucide-react"
 import { MantenimientosTable } from "@/components/mantenimientos-table"
 import type { ColorCenter } from "@/lib/types"
 import type { MantenimientoWithEmpresa, EquipoWithEmpresa } from "@/lib/types"
-import { findEquipoForMantenimientoRow } from "@/lib/data/ids"
+import { buildColorCenterIndex, buildEquipoIndex, findEquipoInIndex } from "@/lib/data/ids"
 
 interface MantenimientosContentProps {
   mantenimientos: MantenimientoWithEmpresa[]
   equipos: EquipoWithEmpresa[]
   colorCenters: ColorCenter[]
   canWrite: boolean
-}
-
-function findEquipo(mant: MantenimientoWithEmpresa, equipos: EquipoWithEmpresa[]): EquipoWithEmpresa | undefined {
-  return findEquipoForMantenimientoRow(mant, equipos)
-}
-
-function findCC(equipo: EquipoWithEmpresa, colorCenters: ColorCenter[]): ColorCenter | undefined {
-  return colorCenters.find((c) => c.empresa_id === equipo.empresa_id && c.id === equipo.color_center_id)
 }
 
 export function MantenimientosContent({
@@ -31,12 +23,15 @@ export function MantenimientosContent({
   canWrite,
 }: MantenimientosContentProps) {
   const [search, setSearch] = useState("")
+  const ccIndex = useMemo(() => buildColorCenterIndex(colorCenters), [colorCenters])
+  const equipoIndex = useMemo(() => buildEquipoIndex(equipos), [equipos])
 
   const filteredMantenimientos = useMemo(() => {
     const term = search.trim().toLowerCase()
+    if (!term) return mantenimientos
     return mantenimientos.filter((mant) => {
-      const equipo = findEquipo(mant, equipos)
-      const cc = equipo ? findCC(equipo, colorCenters) : null
+      const equipo = findEquipoInIndex(mant, equipoIndex)
+      const cc = equipo ? ccIndex.get(`${equipo.empresa_id}-${equipo.color_center_id}`) : null
       const matchSearch =
         !term ||
         mant.realizado_por?.toLowerCase().includes(term) ||
@@ -49,7 +44,7 @@ export function MantenimientosContent({
         (cc?.codigo_interno?.toLowerCase().includes(term))
       return matchSearch
     })
-  }, [mantenimientos, equipos, colorCenters, search])
+  }, [mantenimientos, equipoIndex, ccIndex, search])
 
   return (
     <Card>

@@ -106,6 +106,40 @@ export function resolveDefaultEquipoIdForForm(equipos: Equipo[], defaultEquipoId
   return match?.id ?? trimmed
 }
 
+/** Equipos indexados por empresa + id numérico, para cruzar filas de mantenimientos/incidencias sin recorrer la lista. */
+export type EquipoIndex = Map<string, EquipoWithEmpresa>
+
+export function buildEquipoIndex(equipos: EquipoWithEmpresa[]): EquipoIndex {
+  const index: EquipoIndex = new Map()
+  for (const e of equipos) {
+    const key = `${e.empresa_id}:${parseEquipoId(e.id).numericId}`
+    if (!index.has(key)) index.set(key, e)
+  }
+  return index
+}
+
+/** Como findEquipoForMantenimientoRow, pero sobre un índice de buildEquipoIndex. */
+export function findEquipoInIndex(
+  row: { empresa_id: string; equipo_id: string | null },
+  index: EquipoIndex
+): EquipoWithEmpresa | undefined {
+  if (!row.equipo_id) return undefined
+  const numericId = parseEquipoId(String(row.equipo_id).trim()).numericId
+  return numericId ? index.get(`${row.empresa_id}:${numericId}`) : undefined
+}
+
+/** Sucursales indexadas por `${empresa_id}-${id}`. */
+export type ColorCenterIndex = Map<string, ColorCenter>
+
+export function buildColorCenterIndex(colorCenters: ColorCenter[]): ColorCenterIndex {
+  const index: ColorCenterIndex = new Map()
+  for (const c of colorCenters) {
+    const key = `${c.empresa_id}-${c.id}`
+    if (!index.has(key)) index.set(key, c)
+  }
+  return index
+}
+
 /** Cruza un mantenimiento (empresa + equipo_id numérico o compuesto) con la lista de equipos (id compuesto CODIGO-sucursal-id). */
 export function findEquipoForMantenimientoRow(
   mant: { empresa_id: string; equipo_id: string },

@@ -3,7 +3,13 @@
 import { useMemo, useState } from "react"
 import type { ColorCenter } from "@/lib/types"
 import type { MantenimientoWithEmpresa, EquipoWithEmpresa } from "@/lib/types"
-import { findEquipoForMantenimientoRow } from "@/lib/data/ids"
+import {
+  buildColorCenterIndex,
+  buildEquipoIndex,
+  findEquipoInIndex,
+  type ColorCenterIndex,
+  type EquipoIndex,
+} from "@/lib/data/ids"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -19,12 +25,12 @@ interface MantenimientosTableProps {
   canWrite: boolean
 }
 
-function findEquipo(mant: MantenimientoWithEmpresa, equipos: EquipoWithEmpresa[]): EquipoWithEmpresa | undefined {
-  return findEquipoForMantenimientoRow(mant, equipos)
+function findEquipo(mant: MantenimientoWithEmpresa, equipoIndex: EquipoIndex): EquipoWithEmpresa | undefined {
+  return findEquipoInIndex(mant, equipoIndex)
 }
 
-function findCC(equipo: EquipoWithEmpresa, colorCenters: ColorCenter[]): ColorCenter | undefined {
-  return colorCenters.find((c) => c.empresa_id === equipo.empresa_id && c.id === equipo.color_center_id)
+function findCC(equipo: EquipoWithEmpresa, ccIndex: ColorCenterIndex): ColorCenter | undefined {
+  return ccIndex.get(`${equipo.empresa_id}-${equipo.color_center_id}`)
 }
 
 function getSucursalKey(equipo: EquipoWithEmpresa): string {
@@ -32,6 +38,8 @@ function getSucursalKey(equipo: EquipoWithEmpresa): string {
 }
 
 export function MantenimientosTable({ mantenimientos, equipos, colorCenters, canWrite }: MantenimientosTableProps) {
+  const ccIndex = useMemo(() => buildColorCenterIndex(colorCenters), [colorCenters])
+  const equipoIndex = useMemo(() => buildEquipoIndex(equipos), [equipos])
   const [filterTipo, setFilterTipo] = useState<Set<string> | null>(null)
   const [filterEstado, setFilterEstado] = useState<Set<string> | null>(null)
   const [filterSucursalKey, setFilterSucursalKey] = useState<Set<string> | null>(null)
@@ -48,28 +56,27 @@ export function MantenimientosTable({ mantenimientos, equipos, colorCenters, can
     { value: "Completado", label: "Completado" },
   ], [])
   const sucursalOptions = useMemo(() => {
-    const keys = new Set<string>()
+    const equipoByKey = new Map<string, EquipoWithEmpresa>()
     mantenimientos.forEach((m) => {
-      const eq = findEquipo(m, equipos)
-      if (eq) keys.add(getSucursalKey(eq))
+      const eq = findEquipo(m, equipoIndex)
+      if (eq && !equipoByKey.has(getSucursalKey(eq))) equipoByKey.set(getSucursalKey(eq), eq)
     })
-    return Array.from(keys).map((key) => {
-      const eq = equipos.find((e) => getSucursalKey(e) === key)
-      const cc = eq ? findCC(eq, colorCenters) : undefined
+    return Array.from(equipoByKey.entries()).map(([key, eq]) => {
+      const cc = findCC(eq, ccIndex)
       return { value: key, label: cc ? `${cc.nombre_sucursal} (${cc.codigo_interno})` : key }
     }).sort((a, b) => a.label.localeCompare(b.label))
-  }, [mantenimientos, equipos, colorCenters])
+  }, [mantenimientos, equipoIndex, ccIndex])
 
   const filteredMantenimientos = useMemo(() => {
     return mantenimientos.filter((m) => {
-      const eq = findEquipo(m, equipos)
+      const eq = findEquipo(m, equipoIndex)
       const sucursalKey = eq ? getSucursalKey(eq) : null
       if (filterTipo !== null && !filterTipo.has(m.tipo)) return false
       if (filterEstado !== null && !filterEstado.has(m.estado)) return false
       if (filterSucursalKey !== null && sucursalKey && !filterSucursalKey.has(sucursalKey)) return false
       return true
     })
-  }, [mantenimientos, equipos, filterTipo, filterEstado, filterSucursalKey])
+  }, [mantenimientos, equipoIndex, filterTipo, filterEstado, filterSucursalKey])
 
   const handleSort = (key: string) => {
     setSortBy((prev) => {
@@ -85,10 +92,10 @@ export function MantenimientosTable({ mantenimientos, equipos, colorCenters, can
   const sortedMantenimientos = useMemo(() => {
     if (!sortBy) return filteredMantenimientos
     return [...filteredMantenimientos].sort((a, b) => {
-      const eqA = findEquipo(a, equipos)
-      const eqB = findEquipo(b, equipos)
-      const ccA = eqA ? findCC(eqA, colorCenters) : null
-      const ccB = eqB ? findCC(eqB, colorCenters) : null
+      const eqA = findEquipo(a, equipoIndex)
+      const eqB = findEquipo(b, equipoIndex)
+      const ccA = eqA ? findCC(eqA, ccIndex) : null
+      const ccB = eqB ? findCC(eqB, ccIndex) : null
       let cmp = 0
       if (sortBy === "fecha") cmp = new Date(a.fecha_mantenimiento).getTime() - new Date(b.fecha_mantenimiento).getTime()
       else if (sortBy === "equipo") cmp = `${eqA?.tipo_equipo ?? ""} ${eqA?.marca ?? ""}`.localeCompare(`${eqB?.tipo_equipo ?? ""} ${eqB?.marca ?? ""}`)
@@ -98,7 +105,7 @@ export function MantenimientosTable({ mantenimientos, equipos, colorCenters, can
       else if (sortBy === "estado") cmp = a.estado.localeCompare(b.estado)
       return sortOrder === "asc" ? cmp : -cmp
     })
-  }, [filteredMantenimientos, sortBy, sortOrder, equipos, colorCenters])
+  }, [filteredMantenimientos, sortBy, sortOrder, equipoIndex, ccIndex])
 
   const getEstadoBadge = (estado: string) => {
     switch (estado) {
@@ -167,8 +174,8 @@ export function MantenimientosTable({ mantenimientos, equipos, colorCenters, can
     <>
       <div className="md:hidden space-y-2">
         {sortedMantenimientos.map((mant) => {
-          const equipo = findEquipo(mant, equipos)
-          const colorCenter = equipo ? findCC(equipo, colorCenters) : null
+          const equipo = findEquipo(mant, equipoIndex)
+          const colorCenter = equipo ? findCC(equipo, ccIndex) : null
           return (
             <Link key={mant.id} href={`/mantenimientos/${mant.id}`}>
               <Card className="border border-border/60 shadow-sm card-elevated transition-all duration-200 active:bg-muted/30 rounded-2xl">
@@ -235,8 +242,8 @@ export function MantenimientosTable({ mantenimientos, equipos, colorCenters, can
           </thead>
           <tbody>
             {sortedMantenimientos.map((mant) => {
-              const equipo = findEquipo(mant, equipos)
-              const colorCenter = equipo ? findCC(equipo, colorCenters) : null
+              const equipo = findEquipo(mant, equipoIndex)
+              const colorCenter = equipo ? findCC(equipo, ccIndex) : null
               return (
                 <tr key={mant.id} className="border-b border-border hover:bg-muted/50">
                   <td className="py-3 px-4 font-medium">

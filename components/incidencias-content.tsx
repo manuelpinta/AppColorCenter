@@ -9,22 +9,13 @@ import { Button } from "@/components/ui/button"
 import { IncidenciasTable } from "@/components/incidencias-table"
 import type { Incidencia, ColorCenter, Equipo } from "@/lib/types"
 import type { IncidenciaWithEmpresa, EquipoWithEmpresa } from "@/lib/types"
-import { findEquipoForMantenimientoRow } from "@/lib/data/ids"
+import { buildColorCenterIndex, buildEquipoIndex, findEquipoInIndex } from "@/lib/data/ids"
 
 interface IncidenciasContentProps {
   incidencias: IncidenciaWithEmpresa[]
   colorCenters: ColorCenter[]
   equipos: EquipoWithEmpresa[]
   canWrite: boolean
-}
-
-function findColorCenter(inc: IncidenciaWithEmpresa, colorCenters: ColorCenter[]): ColorCenter | undefined {
-  return colorCenters.find((c) => c.empresa_id === inc.empresa_id && c.id === inc.sucursal_id)
-}
-
-function findEquipo(inc: IncidenciaWithEmpresa, equipos: EquipoWithEmpresa[]): EquipoWithEmpresa | undefined {
-  if (!inc.equipo_id) return undefined
-  return findEquipoForMantenimientoRow(inc, equipos)
 }
 
 export function IncidenciasContent({
@@ -34,12 +25,15 @@ export function IncidenciasContent({
   canWrite,
 }: IncidenciasContentProps) {
   const [search, setSearch] = useState("")
+  const ccIndex = useMemo(() => buildColorCenterIndex(colorCenters), [colorCenters])
+  const equipoIndex = useMemo(() => buildEquipoIndex(equipos), [equipos])
 
   const filteredIncidencias = useMemo(() => {
     const term = search.trim().toLowerCase()
+    if (!term) return incidencias
     return incidencias.filter((inc) => {
-      const cc = findColorCenter(inc, colorCenters)
-      const equipo = findEquipo(inc, equipos)
+      const cc = ccIndex.get(`${inc.empresa_id}-${inc.sucursal_id}`)
+      const equipo = findEquipoInIndex(inc, equipoIndex)
       const matchSearch =
         !term ||
         (inc.quien_reporta?.toLowerCase().includes(term)) ||
@@ -51,7 +45,7 @@ export function IncidenciasContent({
         (equipo?.numero_serie?.toLowerCase().includes(term))
       return matchSearch
     })
-  }, [incidencias, colorCenters, equipos, search])
+  }, [incidencias, ccIndex, equipoIndex, search])
 
   return (
     <Card>

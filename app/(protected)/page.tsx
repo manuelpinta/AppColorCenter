@@ -20,22 +20,15 @@ export default async function DashboardPage({
   searchParams: Promise<{ empresa?: string; e?: string }>
 }) {
   const params = await searchParams
-  const [empresas, colorCentersAll, equiposAll] = await Promise.all([
-    getEmpresasForCurrentUser(),
-    getColorCentersAllBases(),
-    getEquiposAllBases(),
-  ])
+  const empresas = await getEmpresasForCurrentUser()
   const allowedEmpresaIds = new Set(empresas.map((e) => e.id))
   const rawEmpresa = params.empresa ?? params.e
   const singleEmpresaId: EmpresaId | null =
     rawEmpresa && allowedEmpresaIds.has(rawEmpresa) ? (rawEmpresa as EmpresaId) : null
 
   const [colorCenters, equipos] = singleEmpresaId
-    ? await Promise.all([
-        getSucursalesByEmpresa(singleEmpresaId),
-        getEquiposByEmpresa(singleEmpresaId),
-      ])
-    : [colorCentersAll, equiposAll]
+    ? await Promise.all([getSucursalesByEmpresa(singleEmpresaId), getEquiposByEmpresa(singleEmpresaId)])
+    : await Promise.all([getColorCentersAllBases(), getEquiposAllBases()])
 
   const regiones = getRegionesFromColorCenters(colorCenters)
   return (
