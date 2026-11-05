@@ -13,18 +13,12 @@ import { SucursalFilterCombobox } from "@/components/sucursal-filter-combobox"
 import type { Equipo, ColorCenter } from "@/lib/types"
 import type { EquipoWithEmpresa } from "@/lib/types"
 import type { EmpresaId } from "@/lib/empresas-config"
-import { buildSucursalCompositeIdFromIds } from "@/lib/data/ids"
+import { buildColorCenterIndex, buildSucursalCompositeIdFromIds } from "@/lib/data/ids"
 
 interface EquiposContentProps {
   equipos: EquipoWithEmpresa[]
   colorCenters: ColorCenter[]
   canWrite: boolean
-}
-
-function findColorCenter(equipo: EquipoWithEmpresa, colorCenters: ColorCenter[]): ColorCenter | undefined {
-  return colorCenters.find(
-    (c) => c.empresa_id === equipo.empresa_id && c.id === equipo.color_center_id
-  )
 }
 
 const DIAS_POR_VENCER = 90
@@ -34,6 +28,7 @@ export function EquiposContent({ equipos, colorCenters, canWrite }: EquiposConte
   const [sucursalId, setSucursalId] = useState("all")
   const [propiedad, setPropiedad] = useState<"all" | "Propio" | "Arrendado">("all")
   const [soloPorVencer, setSoloPorVencer] = useState(false)
+  const ccIndex = useMemo(() => buildColorCenterIndex(colorCenters), [colorCenters])
 
   const filteredEquipos = useMemo(() => {
     const term = search.trim().toLowerCase()
@@ -42,7 +37,7 @@ export function EquiposContent({ equipos, colorCenters, canWrite }: EquiposConte
     const limiteVencer = new Date(hoy)
     limiteVencer.setDate(limiteVencer.getDate() + DIAS_POR_VENCER)
     return equipos.filter((eq) => {
-      const cc = findColorCenter(eq, colorCenters)
+      const cc = term ? ccIndex.get(`${eq.empresa_id}-${eq.color_center_id}`) : undefined
       const matchSearch =
         !term ||
         eq.tipo_equipo.toLowerCase().includes(term) ||
@@ -66,7 +61,7 @@ export function EquiposContent({ equipos, colorCenters, canWrite }: EquiposConte
           })())
       return matchSearch && matchSucursal && matchPropiedad && matchPorVencer
     })
-  }, [equipos, colorCenters, search, sucursalId, propiedad, soloPorVencer])
+  }, [equipos, ccIndex, search, sucursalId, propiedad, soloPorVencer])
   const activeFilters = [
     search.trim() ? `Busqueda: ${search.trim()}` : null,
     sucursalId !== "all" ? "Sucursal" : null,

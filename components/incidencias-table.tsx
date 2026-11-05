@@ -10,7 +10,13 @@ import { AlertTriangle, Eye, ChevronRight } from "lucide-react"
 import Link from "next/link"
 import { TableColumnFilter } from "@/components/table-column-filter"
 import { TableSortHeader, type SortOrder } from "@/components/table-sort-header"
-import { findEquipoForMantenimientoRow } from "@/lib/data/ids"
+import {
+  buildColorCenterIndex,
+  buildEquipoIndex,
+  findEquipoInIndex,
+  type ColorCenterIndex,
+  type EquipoIndex,
+} from "@/lib/data/ids"
 
 interface IncidenciasTableProps {
   incidencias: IncidenciaWithEmpresa[]
@@ -23,16 +29,17 @@ function getSucursalKey(inc: IncidenciaWithEmpresa): string {
   return inc.empresa_id ? `${inc.empresa_id}-${inc.sucursal_id}` : inc.sucursal_id
 }
 
-function findCC(inc: IncidenciaWithEmpresa, colorCenters: ColorCenter[]): ColorCenter | undefined {
-  return colorCenters.find((c) => c.empresa_id === inc.empresa_id && c.id === inc.sucursal_id)
+function findCC(inc: IncidenciaWithEmpresa, ccIndex: ColorCenterIndex): ColorCenter | undefined {
+  return ccIndex.get(`${inc.empresa_id}-${inc.sucursal_id}`)
 }
 
-function findEquipo(inc: IncidenciaWithEmpresa, equipos: EquipoWithEmpresa[]): EquipoWithEmpresa | undefined {
-  if (!inc.equipo_id) return undefined
-  return findEquipoForMantenimientoRow(inc, equipos)
+function findEquipo(inc: IncidenciaWithEmpresa, equipoIndex: EquipoIndex): EquipoWithEmpresa | undefined {
+  return findEquipoInIndex(inc, equipoIndex)
 }
 
 export function IncidenciasTable({ incidencias, colorCenters, equipos, canWrite }: IncidenciasTableProps) {
+  const ccIndex = useMemo(() => buildColorCenterIndex(colorCenters), [colorCenters])
+  const equipoIndex = useMemo(() => buildEquipoIndex(equipos), [equipos])
   const [filterEstado, setFilterEstado] = useState<Set<string> | null>(null)
   const [filterSeveridad, setFilterSeveridad] = useState<Set<string> | null>(null)
   const [filterSucursalKey, setFilterSucursalKey] = useState<Set<string> | null>(null)
@@ -53,13 +60,16 @@ export function IncidenciasTable({ incidencias, colorCenters, equipos, canWrite 
     { value: "Crítica", label: "Crítica" },
   ], [])
   const sucursalOptions = useMemo(() => {
-    const keys = new Set(incidencias.map(getSucursalKey))
-    return Array.from(keys).map((key) => {
-      const inc = incidencias.find((i) => getSucursalKey(i) === key)
-      const cc = inc ? findCC(inc, colorCenters) : undefined
+    const firstByKey = new Map<string, IncidenciaWithEmpresa>()
+    for (const i of incidencias) {
+      const k = getSucursalKey(i)
+      if (!firstByKey.has(k)) firstByKey.set(k, i)
+    }
+    return Array.from(firstByKey.entries()).map(([key, inc]) => {
+      const cc = findCC(inc, ccIndex)
       return { value: key, label: cc ? `${cc.nombre_sucursal} (${cc.codigo_interno})` : key }
     }).sort((a, b) => a.label.localeCompare(b.label))
-  }, [incidencias, colorCenters])
+  }, [incidencias, ccIndex])
 
   const filteredIncidencias = useMemo(() => {
     return incidencias.filter((inc) => {
@@ -87,10 +97,10 @@ export function IncidenciasTable({ incidencias, colorCenters, equipos, canWrite 
   const sortedIncidencias = useMemo(() => {
     if (!sortBy) return filteredIncidencias
     return [...filteredIncidencias].sort((a, b) => {
-      const ccA = findCC(a, colorCenters)
-      const ccB = findCC(b, colorCenters)
-      const eqA = findEquipo(a, equipos)
-      const eqB = findEquipo(b, equipos)
+      const ccA = findCC(a, ccIndex)
+      const ccB = findCC(b, ccIndex)
+      const eqA = findEquipo(a, equipoIndex)
+      const eqB = findEquipo(b, equipoIndex)
       let cmp = 0
       if (sortBy === "fecha") cmp = new Date(a.fecha_reporte).getTime() - new Date(b.fecha_reporte).getTime()
       else if (sortBy === "reporto") cmp = (a.quien_reporta ?? "").localeCompare(b.quien_reporta ?? "")
@@ -101,7 +111,7 @@ export function IncidenciasTable({ incidencias, colorCenters, equipos, canWrite 
       else if (sortBy === "estado") cmp = a.estado.localeCompare(b.estado)
       return sortOrder === "asc" ? cmp : -cmp
     })
-  }, [filteredIncidencias, sortBy, sortOrder, colorCenters, equipos])
+  }, [filteredIncidencias, sortBy, sortOrder, ccIndex, equipoIndex])
 
   const getEstadoBadge = (estado: string) => {
     switch (estado) {
@@ -161,8 +171,8 @@ export function IncidenciasTable({ incidencias, colorCenters, equipos, canWrite 
     <>
       <div className="md:hidden space-y-2">
         {sortedIncidencias.map((inc) => {
-          const cc = findCC(inc, colorCenters)
-          const equipo = findEquipo(inc, equipos)
+          const cc = findCC(inc, ccIndex)
+          const equipo = findEquipo(inc, equipoIndex)
           return (
             <Link key={inc.id} href={`/incidencias/${inc.id}`}>
               <Card className="border border-border/60 shadow-sm card-elevated transition-all duration-200 active:bg-muted/30 rounded-2xl">
@@ -229,8 +239,8 @@ export function IncidenciasTable({ incidencias, colorCenters, equipos, canWrite 
           </thead>
           <tbody>
             {sortedIncidencias.map((inc) => {
-              const cc = findCC(inc, colorCenters)
-              const equipo = findEquipo(inc, equipos)
+              const cc = findCC(inc, ccIndex)
+              const equipo = findEquipo(inc, equipoIndex)
               return (
                 <tr key={inc.id} className="border-b border-border hover:bg-muted/50">
                   <td className="py-3 px-4 text-muted-foreground whitespace-nowrap">

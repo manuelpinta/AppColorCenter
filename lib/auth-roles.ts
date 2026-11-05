@@ -1,3 +1,4 @@
+import { cache } from "react"
 import { redirect } from "next/navigation"
 import { auth0 } from "@/lib/auth0"
 import { getUserRolesFromManagementAPI } from "@/lib/auth0-organizations"
@@ -11,7 +12,7 @@ type RolesForAuthorization = {
   rolesClaimPresent: boolean
 }
 
-async function getRolesForAuthorization(): Promise<RolesForAuthorization> {
+const getRolesForAuthorization = cache(async (): Promise<RolesForAuthorization> => {
   const session = await auth0.getSession()
   const user = session?.user
   const rolesClaimValue = user?.[ROLES_CLAIM]
@@ -34,7 +35,7 @@ async function getRolesForAuthorization(): Promise<RolesForAuthorization> {
   } catch {
     return { roles: [], rolesClaimPresent }
   }
-}
+})
 
 export async function getUserRoles(): Promise<string[]> {
   return (await getRolesForAuthorization()).roles

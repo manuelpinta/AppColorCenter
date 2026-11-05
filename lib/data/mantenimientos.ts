@@ -4,9 +4,8 @@ import { ClientError } from "@/lib/client-error"
 import type { EmpresaId } from "@/lib/db"
 import { getPool, getEmpresaIdsForDataLayer, getEmpresaIdsToSearch, clearPool } from "@/lib/db"
 import { parseId } from "./ids"
-import { getNombreUsuarioById } from "./usuarios"
 import { timed, withTimeout, getEmpresaQueryTimeoutMs } from "./timing"
-import { getCachedIf, cacheKeyForEmpresas } from "./cache"
+import { getCachedIf, cacheKeyForEmpresas, invalidateCachedList } from "./cache"
 
 type MantenimientoRow = {
   id: number
@@ -24,6 +23,9 @@ type MantenimientoRow = {
   notas: string | null
   created_at: unknown
   updated_at: unknown
+  tecnico_nombre: string | null
+  tipo_nombre: string | null
+  estado_nombre: string | null
 }
 
 const schemaCapabilitiesCache = new WeakMap<Pool, { realizadoPorColumn: boolean }>()
@@ -47,17 +49,7 @@ async function getSchemaCapabilities(pool: Pool): Promise<{ realizadoPorColumn: 
   }
 }
 
-async function getCatalogoNombreById(pool: Pool, tabla: string, id: number): Promise<string | null> {
-  const [rows] = await pool.query<{ nombre: string }[]>(`SELECT nombre FROM ${tabla} WHERE id = ?`, [id])
-  const arr = Array.isArray(rows) ? rows : []
-  return arr[0]?.nombre ?? null
-}
-
-async function resolveMantenimientoRow(pool: Pool, row: MantenimientoRow): Promise<Mantenimiento> {
-  const tecnicoNombre =
-    row.tecnico_id != null ? await getNombreUsuarioById(pool, row.tecnico_id) : null
-  const tipoNombre = await getCatalogoNombreById(pool, "cat_tipos_mantenimiento", row.tipo_id)
-  const estadoNombre = await getCatalogoNombreById(pool, "cat_estados_mantenimiento", row.estado_id)
+function mapMantenimientoRow(row: MantenimientoRow): Mantenimiento {
   const realizadoPor =
     row.realizado_por === "Externo" || row.realizado_por === "Interno"
       ? row.realizado_por
@@ -66,15 +58,15 @@ async function resolveMantenimientoRow(pool: Pool, row: MantenimientoRow): Promi
     id: String(row.id),
     equipo_id: String(row.equipo_id),
     incidencia_id: row.incidencia_id != null ? String(row.incidencia_id) : null,
-    tipo: (tipoNombre as Mantenimiento["tipo"]) ?? "Correctivo",
+    tipo: (row.tipo_nombre as Mantenimiento["tipo"]) ?? "Correctivo",
     realizado_por: realizadoPor,
-    tecnico_responsable: tecnicoNombre ?? (row.tecnico_id != null ? String(row.tecnico_id) : null),
+    tecnico_responsable: row.tecnico_nombre ?? (row.tecnico_id != null ? String(row.tecnico_id) : null),
     fecha_mantenimiento: row.fecha_mantenimiento != null ? (typeof row.fecha_mantenimiento === "string" ? row.fecha_mantenimiento : String(row.fecha_mantenimiento)) : "",
     descripcion: row.descripcion,
     piezas_cambiadas: row.piezas_cambiadas ?? null,
     tiempo_fuera_servicio: row.tiempo_fuera_servicio != null ? Number(row.tiempo_fuera_servicio) : null,
     costo: row.costo != null ? Number(row.costo) : null,
-    estado: (estadoNombre as Mantenimiento["estado"]) ?? "Pendiente",
+    estado: (row.estado_nombre as Mantenimiento["estado"]) ?? "Pendiente",
     notas: row.notas ?? null,
     created_at: row.created_at != null ? String(row.created_at) : "",
     updated_at: row.updated_at != null ? String(row.updated_at) : "",
@@ -89,49 +81,44 @@ async function buildMantenimientoSelect(pool: Pool): Promise<string> {
            ${realizadoPorSql} AS realizado_por,
            m.tecnico_id, m.fecha_mantenimiento,
            m.descripcion, m.piezas_cambiadas, m.tiempo_fuera_servicio, m.costo, m.estado_id, m.notas,
-           m.created_at, m.updated_at
+           m.created_at, m.updated_at,
+           NULLIF(TRIM(u.nombre), '') AS tecnico_nombre,
+           tm.nombre AS tipo_nombre,
+           em.nombre AS estado_nombre
     FROM mantenimientos m
+    LEFT JOIN usuarios u ON u.id = m.tecnico_id
+    LEFT JOIN cat_tipos_mantenimiento tm ON tm.id = m.tipo_id
+    LEFT JOIN cat_estados_mantenimiento em ON em.id = m.estado_id
   `
 }
 
-export async function getMantenimientos(pool: Pool): Promise<Mantenimiento[]> {
+async function queryMantenimientos(pool: Pool, where: string, params: unknown[] = []): Promise<Mantenimiento[]> {
   const MANT_SELECT = await buildMantenimientoSelect(pool)
   const [rows] = await pool.query<MantenimientoRow[]>(
-    `${MANT_SELECT} ORDER BY m.fecha_mantenimiento DESC, m.id DESC`
+    `${MANT_SELECT} ${where} ORDER BY m.fecha_mantenimiento DESC, m.id DESC`,
+    params
   )
-  const arr = Array.isArray(rows) ? rows : []
-  return Promise.all(arr.map((r) => resolveMantenimientoRow(pool, r)))
+  return (Array.isArray(rows) ? rows : []).map(mapMantenimientoRow)
+}
+
+export async function getMantenimientos(pool: Pool): Promise<Mantenimiento[]> {
+  return queryMantenimientos(pool, "")
 }
 
 export async function getMantenimientosByIncidenciaId(
   pool: Pool,
   incidenciaId: string
 ): Promise<Mantenimiento[]> {
-  const MANT_SELECT = await buildMantenimientoSelect(pool)
-  const [rows] = await pool.query<MantenimientoRow[]>(
-    `${MANT_SELECT} WHERE m.incidencia_id = ? ORDER BY m.fecha_mantenimiento DESC, m.id DESC`,
-    [incidenciaId]
-  )
-  const arr = Array.isArray(rows) ? rows : []
-  return Promise.all(arr.map((r) => resolveMantenimientoRow(pool, r)))
+  return queryMantenimientos(pool, "WHERE m.incidencia_id = ?", [incidenciaId])
 }
 
 export async function getMantenimientosByEquipoId(pool: Pool, equipoId: string): Promise<Mantenimiento[]> {
-  const MANT_SELECT = await buildMantenimientoSelect(pool)
-  const [rows] = await pool.query<MantenimientoRow[]>(
-    `${MANT_SELECT} WHERE m.equipo_id = ? ORDER BY m.fecha_mantenimiento DESC, m.id DESC`,
-    [equipoId]
-  )
-  const arr = Array.isArray(rows) ? rows : []
-  return Promise.all(arr.map((r) => resolveMantenimientoRow(pool, r)))
+  return queryMantenimientos(pool, "WHERE m.equipo_id = ?", [equipoId])
 }
 
 export async function getMantenimientoById(pool: Pool, mantenimientoId: string): Promise<Mantenimiento | null> {
-  const MANT_SELECT = await buildMantenimientoSelect(pool)
-  const [rows] = await pool.query<MantenimientoRow[]>(`${MANT_SELECT} WHERE m.id = ?`, [mantenimientoId])
-  const arr = Array.isArray(rows) ? rows : []
-  const row = arr[0]
-  return row ? resolveMantenimientoRow(pool, row) : null
+  const list = await queryMantenimientos(pool, "WHERE m.id = ?", [mantenimientoId])
+  return list[0] ?? null
 }
 
 export async function crearMantenimiento(
@@ -213,6 +200,7 @@ export async function crearMantenimiento(
     )
     insertId = (result as unknown as { insertId: number }).insertId
   }
+  invalidateCachedList("mantenimientosAllBases")
 
   const mantenimiento = await getMantenimientoById(pool, String(insertId))
   if (!mantenimiento) throw new Error("No se pudo leer el mantenimiento creado")
@@ -298,6 +286,7 @@ export async function actualizarMantenimiento(
   if (updates.length > 0) {
     values.push(Number(mantenimientoId))
     await pool.query(`UPDATE mantenimientos SET ${updates.join(", ")} WHERE id = ?`, values)
+    invalidateCachedList("mantenimientosAllBases")
   }
 
   const mantenimiento = await getMantenimientoById(pool, mantenimientoId)

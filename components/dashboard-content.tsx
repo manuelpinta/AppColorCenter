@@ -103,11 +103,21 @@ export function DashboardContent({
   const effectiveSortKey = sortBy ?? DEFAULT_SORT_KEY
   const effectiveSortOrder = sortBy === null ? DEFAULT_SORT_ORDER : sortOrder
 
+  const equiposCountByCenter = useMemo(() => {
+    const counts = new Map<string, number>()
+    for (const e of equipos) {
+      const key = `${e.empresa_id}-${e.color_center_id}`
+      counts.set(key, (counts.get(key) ?? 0) + 1)
+    }
+    return counts
+  }, [equipos])
+
+  const getEquiposCount = (center: ColorCenter) =>
+    equiposCountByCenter.get(`${center.empresa_id}-${center.id}`) ?? 0
+
   const sortedCenters = useMemo(() => {
     const locale = "en"
     const getEmpresaNombre = (id: string) => empresas.find((e) => e.id === id)?.nombre ?? ""
-    const getEquiposCount = (c: ColorCenter) =>
-      equipos.filter((e) => e.empresa_id === c.empresa_id && e.color_center_id === c.id).length
     const sorted = [...columnFilteredCenters].sort((a, b) => {
       let cmp = 0
       if (effectiveSortKey === "sucursal") {
@@ -122,7 +132,7 @@ export function DashboardContent({
       return effectiveSortOrder === "asc" ? cmp : -cmp
     })
     return sorted
-  }, [columnFilteredCenters, effectiveSortKey, effectiveSortOrder, empresas, equipos])
+  }, [columnFilteredCenters, effectiveSortKey, effectiveSortOrder, empresas, equiposCountByCenter])
 
   const totalPages = Math.ceil(sortedCenters.length / ITEMS_PER_PAGE)
   const paginatedCenters = useMemo(() => {
@@ -131,11 +141,8 @@ export function DashboardContent({
   }, [sortedCenters, currentPage])
 
   const filteredEquipos = useMemo(() => {
-    return equipos.filter((e) =>
-      sortedCenters.some(
-        (c) => c.empresa_id === e.empresa_id && c.id === e.color_center_id
-      )
-    )
+    const centerKeys = new Set(sortedCenters.map((c) => `${c.empresa_id}-${c.id}`))
+    return equipos.filter((e) => centerKeys.has(`${e.empresa_id}-${e.color_center_id}`))
   }, [sortedCenters, equipos])
 
   const kpis = useMemo(() => {
@@ -178,11 +185,6 @@ export function DashboardContent({
 
   const getEmpresaNombre = (empresaId: string) =>
     empresas.find((e) => e.id === empresaId)?.nombre || ""
-
-  const getEquiposCount = (center: ColorCenter) =>
-    equipos.filter(
-      (e) => e.empresa_id === center.empresa_id && e.color_center_id === center.id
-    ).length
 
   const getCenterCompositeId = (center: ColorCenter) =>
     center.empresa_id ? `${center.empresa_id}-${center.id}` : center.id

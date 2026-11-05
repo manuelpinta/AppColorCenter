@@ -85,8 +85,16 @@ export function SucursalesContent({
   }, [filteredCenters, filterEmpresaSet, filterRegionSet])
 
   const getEmpresaNombreForSort = (id: string) => empresas.find((e) => e.id === id)?.nombre ?? ""
-  const getEquiposCountForSort = (c: ColorCenter) =>
-    equipos.filter((e) => e.empresa_id === c.empresa_id && e.color_center_id === c.id).length
+  const equiposCountByCenter = useMemo(() => {
+    const counts = new Map<string, number>()
+    for (const e of equipos) {
+      const key = `${e.empresa_id}-${e.color_center_id}`
+      counts.set(key, (counts.get(key) ?? 0) + 1)
+    }
+    return counts
+  }, [equipos])
+  const getEquiposCount = (center: ColorCenter) =>
+    equiposCountByCenter.get(`${center.empresa_id}-${center.id}`) ?? 0
 
   /** Ciclo: 1º click → Desc, 2º click → Asc, 3º click → Reset (orden por defecto) */
   const handleSort = (key: string) => {
@@ -113,11 +121,11 @@ export function SucursalesContent({
       if (effectiveSortKey === "sucursal") cmp = (a.nombre_sucursal ?? "").localeCompare(b.nombre_sucursal ?? "")
       else if (effectiveSortKey === "empresa") cmp = getEmpresaNombreForSort(a.empresa_id).localeCompare(getEmpresaNombreForSort(b.empresa_id))
       else if (effectiveSortKey === "region") cmp = (a.region ?? "").localeCompare(b.region ?? "")
-      else if (effectiveSortKey === "equipos") cmp = getEquiposCountForSort(a) - getEquiposCountForSort(b)
+      else if (effectiveSortKey === "equipos") cmp = getEquiposCount(a) - getEquiposCount(b)
       return effectiveSortOrder === "asc" ? cmp : -cmp
     })
     return sorted
-  }, [columnFilteredCenters, effectiveSortKey, effectiveSortOrder, empresas, equipos])
+  }, [columnFilteredCenters, effectiveSortKey, effectiveSortOrder, empresas, equiposCountByCenter])
 
   const totalPages = Math.ceil(sortedCenters.length / ITEMS_PER_PAGE)
   const paginatedCenters = useMemo(() => {
@@ -137,11 +145,6 @@ export function SucursalesContent({
       }),
     [empresas, colorCenters]
   )
-
-  const getEquiposCount = (center: ColorCenter) =>
-    equipos.filter(
-      (e) => e.empresa_id === center.empresa_id && e.color_center_id === center.id
-    ).length
 
   return (
     <div className="pb-20 lg:pb-0">
