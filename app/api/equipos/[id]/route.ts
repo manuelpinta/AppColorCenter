@@ -19,6 +19,7 @@ const equipoAllowed = [
   "tipo_propiedad",
   "arrendador",
   "fecha_vencimiento_arrendamiento",
+  "numero_contrato",
   "estado",
   "ultima_calibracion",
   "proxima_revision",
@@ -33,6 +34,7 @@ const leasingFields = [
   "tipo_propiedad",
   "arrendador",
   "fecha_vencimiento_arrendamiento",
+  "numero_contrato",
 ] as const satisfies readonly (keyof EquipoPatchInput)[]
 
 const normatividadAllowed = [

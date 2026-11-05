@@ -289,6 +289,7 @@ CREATE TABLE equipos (
   tipo_propiedad_id INT NOT NULL,
   arrendador_id INT DEFAULT NULL COMMENT 'FK a arrendadores; solo si tipo_propiedad = Arrendado',
   fecha_vencimiento_arrendamiento DATE DEFAULT NULL,
+  numero_contrato VARCHAR(100) DEFAULT NULL COMMENT 'Número de contrato; solo si tipo_propiedad = Arrendado',
   estado_id INT NOT NULL,
   ultima_calibracion DATE DEFAULT NULL,
   proxima_revision DATE DEFAULT NULL,

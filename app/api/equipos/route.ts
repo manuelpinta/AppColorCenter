@@ -33,6 +33,8 @@ export async function POST(request: NextRequest) {
   const arrendador = canEditNormatividad && tipoPropiedad === "Arrendado" ? (data.arrendador ?? null) : null
   const fechaVencimiento =
     canEditNormatividad && tipoPropiedad === "Arrendado" ? (data.fecha_vencimiento_arrendamiento ?? null) : null
+  const numeroContrato =
+    canEditNormatividad && tipoPropiedad === "Arrendado" ? (data.numero_contrato ?? null) : null
 
   try {
     const pool = await getPool(empresaId)
@@ -49,6 +51,7 @@ export async function POST(request: NextRequest) {
       tipo_propiedad: tipoPropiedad,
       arrendador,
       fecha_vencimiento_arrendamiento: fechaVencimiento,
+      numero_contrato: numeroContrato,
       estado: data.estado,
       ultima_calibracion: data.ultima_calibracion ?? null,
       proxima_revision: data.proxima_revision ?? null,
