@@ -25,6 +25,7 @@ type EquipoRow = {
   tipo_propiedad: string
   arrendador: string | null
   fecha_vencimiento_arrendamiento: string | null
+  numero_contrato: string | null
   estado: string
   ultima_calibracion: string | null
   proxima_revision: string | null
@@ -50,6 +51,7 @@ type EquipoInput = {
   arrendador?: string | null
   arrendador_id?: number | null
   fecha_vencimiento_arrendamiento?: string | null
+  numero_contrato?: string | null
   estado: Equipo["estado"]
   ultima_calibracion?: string | null
   proxima_revision?: string | null
@@ -110,6 +112,26 @@ async function ensureMarcaTipo(pool: Pool, marcaId: number, tipoEquipoId: number
   }
 }
 
+const equipoSchemaCache = new WeakMap<Pool, { numeroContrato: boolean }>()
+
+async function getEquipoSchemaCaps(pool: Pool): Promise<{ numeroContrato: boolean }> {
+  const cached = equipoSchemaCache.get(pool)
+  if (cached) return cached
+  try {
+    const [rows] = await pool.query<{ cnt: number }[]>(
+      "SELECT COUNT(*) AS cnt FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'equipos' AND COLUMN_NAME = 'numero_contrato'"
+    )
+    const arr = Array.isArray(rows) ? rows : []
+    const caps = { numeroContrato: Number(arr[0]?.cnt ?? 0) > 0 }
+    equipoSchemaCache.set(pool, caps)
+    return caps
+  } catch {
+    const fallback = { numeroContrato: false }
+    equipoSchemaCache.set(pool, fallback)
+    return fallback
+  }
+}
+
 function mapEquipoRow(row: EquipoRow): Equipo {
   return {
     id: String(row.id),
@@ -122,6 +144,7 @@ function mapEquipoRow(row: EquipoRow): Equipo {
     tipo_propiedad: row.tipo_propiedad as Equipo["tipo_propiedad"],
     arrendador: row.arrendador ?? null,
     fecha_vencimiento_arrendamiento: row.fecha_vencimiento_arrendamiento ?? null,
+    numero_contrato: row.numero_contrato ?? null,
     estado: row.estado as Equipo["estado"],
     ultima_calibracion: row.ultima_calibracion ?? null,
     proxima_revision: row.proxima_revision ?? null,
@@ -134,9 +157,12 @@ function mapEquipoRow(row: EquipoRow): Equipo {
   }
 }
 
-const EQUIPO_SELECT = `
+async function buildEquipoSelect(pool: Pool): Promise<string> {
+  const caps = await getEquipoSchemaCaps(pool)
+  const numeroContratoSql = caps.numeroContrato ? "e.numero_contrato" : "NULL"
+  return `
   SELECT e.id, e.sucursal_id, e.numero_serie, e.fecha_compra, e.fecha_vencimiento_arrendamiento,
-         e.ultima_calibracion, e.proxima_revision, e.codigo_qr, e.foto_url, e.documentos_url, e.notas,
+         ${numeroContratoSql} AS numero_contrato, e.ultima_calibracion, e.proxima_revision, e.codigo_qr, e.foto_url, e.documentos_url, e.notas,
          e.created_at, e.updated_at,
          te.nombre AS tipo_equipo, m.nombre AS marca, mo.nombre AS modelo,
          tp.nombre AS tipo_propiedad, a.nombre AS arrendador, ee.nombre AS estado
@@ -148,20 +174,24 @@ const EQUIPO_SELECT = `
   LEFT JOIN arrendadores a ON a.id = e.arrendador_id
   JOIN cat_estados_equipo ee ON ee.id = e.estado_id
 `
+}
 
 export async function getEquiposBySucursal(pool: Pool, sucursalId: string): Promise<Equipo[]> {
+  const EQUIPO_SELECT = await buildEquipoSelect(pool)
   const [rows] = await pool.query<EquipoRow[]>(`${EQUIPO_SELECT} WHERE e.sucursal_id = ? ORDER BY e.id`, [sucursalId])
   const arr = Array.isArray(rows) ? rows : []
   return arr.map(mapEquipoRow)
 }
 
 export async function getEquipos(pool: Pool): Promise<Equipo[]> {
+  const EQUIPO_SELECT = await buildEquipoSelect(pool)
   const [rows] = await pool.query<EquipoRow[]>(`${EQUIPO_SELECT} ORDER BY e.id`)
   const arr = Array.isArray(rows) ? rows : []
   return arr.map(mapEquipoRow)
 }
 
 export async function getEquipoById(pool: Pool, equipoId: string): Promise<Equipo | null> {
+  const EQUIPO_SELECT = await buildEquipoSelect(pool)
   const [rows] = await pool.query<EquipoRow[]>(`${EQUIPO_SELECT} WHERE e.id = ?`, [equipoId])
   const arr = Array.isArray(rows) ? rows : []
   const row = arr[0]
@@ -281,6 +311,10 @@ export async function actualizarEquipo(
     updates.push("fecha_vencimiento_arrendamiento = ?")
     values.push(data.fecha_vencimiento_arrendamiento || null)
   }
+  if (data.numero_contrato !== undefined && (await getEquipoSchemaCaps(pool)).numeroContrato) {
+    updates.push("numero_contrato = ?")
+    values.push(data.numero_contrato || null)
+  }
   if (data.ultima_calibracion !== undefined) {
     updates.push("ultima_calibracion = ?")
     values.push(data.ultima_calibracion || null)
@@ -323,8 +357,12 @@ export async function actualizarEquipo(
       values.push(pid)
     }
   }
+  const hasValidMarca =
+    (typeof data.marca_id === "number" && data.marca_id > 0) || Boolean(data.marca?.trim())
+  const hasValidModelo =
+    (typeof data.modelo_id === "number" && data.modelo_id > 0) || Boolean(data.modelo?.trim())
   let nextMarcaId: number | null = null
-  if (data.marca !== undefined || data.marca_id !== undefined) {
+  if (hasValidMarca) {
     nextMarcaId = await resolveMarcaId(pool, { marca: data.marca ?? null, marca_id: data.marca_id ?? null })
     const tipoForMarca = nextTipoId ?? (
       await resolveTipoId(pool, { tipo_equipo: equipo.tipo_equipo, tipo_equipo_id: null })
@@ -332,11 +370,11 @@ export async function actualizarEquipo(
     await ensureMarcaTipo(pool, nextMarcaId, tipoForMarca)
     updates.push("marca_id = ?")
     values.push(nextMarcaId)
-    if (data.modelo === undefined && data.modelo_id === undefined) {
+    if (!hasValidModelo) {
       updates.push("modelo_id = NULL")
     }
   }
-  if (data.modelo !== undefined || data.modelo_id !== undefined) {
+  if (hasValidModelo) {
     const markaId = nextMarcaId ?? (
       await resolveMarcaId(pool, { marca: equipo.marca, marca_id: null })
     )
@@ -411,13 +449,41 @@ export async function crearEquipo(
     arrendador_id = Array.isArray(ar) && ar[0] ? ar[0].id : null
   }
 
+  const caps = await getEquipoSchemaCaps(pool)
+  const numeroContratoValue = data.tipo_propiedad === "Arrendado" ? data.numero_contrato || null : null
   const [result] = await pool.query<{ insertId: number }>(
-    `INSERT INTO equipos (
+    caps.numeroContrato
+      ? `INSERT INTO equipos (
+      sucursal_id, tipo_equipo_id, marca_id, modelo_id, numero_serie, fecha_compra,
+      tipo_propiedad_id, arrendador_id, fecha_vencimiento_arrendamiento, numero_contrato, estado_id,
+      ultima_calibracion, proxima_revision, notas, equipo_ups_id, equipo_regulador_id, equipo_impresora_id
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      : `INSERT INTO equipos (
       sucursal_id, tipo_equipo_id, marca_id, modelo_id, numero_serie, fecha_compra,
       tipo_propiedad_id, arrendador_id, fecha_vencimiento_arrendamiento, estado_id,
       ultima_calibracion, proxima_revision, notas, equipo_ups_id, equipo_regulador_id, equipo_impresora_id
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [
+    caps.numeroContrato
+      ? [
+      Number(data.color_center_id),
+      tipo_equipo_id,
+      marca_id,
+      modelo_id,
+      data.numero_serie ?? null,
+      data.fecha_compra || null,
+      tipo_propiedad_id,
+      arrendador_id,
+      data.fecha_vencimiento_arrendamiento || null,
+      numeroContratoValue,
+      estado_id,
+      data.ultima_calibracion || null,
+      data.proxima_revision || null,
+      data.notas ?? null,
+      data.equipo_ups_id ?? null,
+      data.equipo_regulador_id ?? null,
+      data.equipo_impresora_id ?? null,
+    ]
+      : [
       Number(data.color_center_id),
       tipo_equipo_id,
       marca_id,

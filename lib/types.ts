@@ -42,6 +42,8 @@ export interface Equipo {
   arrendador: string | null
   /** Fecha de vencimiento del contrato de arrendamiento (solo cuando tipo_propiedad = Arrendado). */
   fecha_vencimiento_arrendamiento: string | null
+  /** Número de contrato de arrendamiento (solo cuando tipo_propiedad = Arrendado). */
+  numero_contrato: string | null
   estado: "Operativo" | "Mantenimiento" | "Inactivo" | "Fuera de Servicio"
   ultima_calibracion: string | null
   proxima_revision: string | null

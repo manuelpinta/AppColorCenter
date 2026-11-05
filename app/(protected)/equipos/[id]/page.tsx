@@ -244,6 +244,9 @@ export default async function EquipoDetailPage({ params }: { params: Promise<{ i
                           ? "En arrendamiento"
                           : "Propiedad nuestra"}
                     </p>
+                    {equipo.tipo_propiedad === "Arrendado" && equipo.numero_contrato && (
+                      <p className="text-sm text-muted-foreground mt-1">Contrato {equipo.numero_contrato}</p>
+                    )}
                     {equipo.tipo_propiedad === "Arrendado" && equipo.fecha_vencimiento_arrendamiento && (
                       <div className="mt-2 flex flex-wrap items-center gap-2">
                         <span className="text-sm text-muted-foreground">

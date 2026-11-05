@@ -132,6 +132,7 @@ export function EquipoForm({
     tipo_propiedad: (equipo?.tipo_propiedad ?? "Propio") as "Propio" | "Arrendado",
     arrendador_id: "",
     fecha_vencimiento_arrendamiento: equipo?.fecha_vencimiento_arrendamiento ?? "",
+    numero_contrato: equipo?.numero_contrato ?? "",
     estado: equipo?.estado || "Operativo",
     ultima_calibracion: equipo?.ultima_calibracion || "",
     proxima_revision: equipo?.proxima_revision || "",
@@ -215,19 +216,15 @@ export function EquipoForm({
       .catch(() => setCatalogModelos([]))
   }, [empresaId, formData.marca_id])
 
-  const catalogSyncedForEdit = useRef(false)
-  // Al editar: cuando el catálogo carga, rellenar una vez marca_id, modelo_id, arrendador_id desde nombres del equipo
   useEffect(() => {
-    if (!equipo || catalogLoading || catalogSyncedForEdit.current) return
-    if (catalogMarcas.length === 0 && catalogArrendadores.length === 0) return
-    catalogSyncedForEdit.current = true
+    if (!equipo) return
     setFormData((prev) => {
-      let next = { ...prev }
+      let next = prev
       if (equipo.marca && catalogMarcas.length > 0 && !prev.marca_id) {
         const found = catalogMarcas.find((m) => m.nombre === equipo.marca)
         if (found) next = { ...next, marca_id: found.id }
       }
-      if (equipo.modelo && catalogModelos.length > 0 && !prev.modelo_id && next.marca_id) {
+      if (equipo.modelo && catalogModelos.length > 0 && !next.modelo_id && next.marca_id) {
         const found = catalogModelos.find((m) => m.nombre === equipo.modelo && m.marca_id === next.marca_id)
         if (found) next = { ...next, modelo_id: found.id }
       }
@@ -237,7 +234,7 @@ export function EquipoForm({
       }
       return next
     })
-  }, [equipo, catalogLoading, catalogMarcas, catalogModelos, catalogArrendadores])
+  }, [equipo, catalogMarcas, catalogModelos, catalogArrendadores])
 
   const marcaOptions = useMemo(
     () => catalogMarcas.map((m) => ({ value: m.id, label: m.nombre })),
@@ -277,7 +274,6 @@ export function EquipoForm({
   const handleEmpresaChange = (value: string) => {
     setEmpresaId(value)
     setZona("")
-    catalogSyncedForEdit.current = false
     setFormData((prev) => ({
       ...prev,
       color_center_id: "",
@@ -323,32 +319,36 @@ export function EquipoForm({
         }
       }
       const arrendadorNombre = catalogArrendadores.find((a) => a.id === formData.arrendador_id)?.nombre || null
+      const leasingPayload =
+        formData.tipo_propiedad === "Arrendado"
+          ? {
+              tipo_propiedad: "Arrendado" as const,
+              arrendador: arrendadorNombre,
+              fecha_vencimiento_arrendamiento: formData.fecha_vencimiento_arrendamiento || null,
+              numero_contrato: formData.numero_contrato.trim() || null,
+            }
+          : {
+              tipo_propiedad: "Propio" as const,
+              arrendador: null,
+              fecha_vencimiento_arrendamiento: null,
+              numero_contrato: null,
+            }
 
       if (equipo) {
         const body: Record<string, unknown> = isRestrictedEdit
           ? {
               fecha_compra: formData.fecha_compra || null,
-              tipo_propiedad: formData.tipo_propiedad,
-              arrendador: formData.tipo_propiedad === "Arrendado" ? arrendadorNombre : null,
-              fecha_vencimiento_arrendamiento:
-                formData.tipo_propiedad === "Arrendado" ? formData.fecha_vencimiento_arrendamiento || null : null,
+              ...leasingPayload,
             }
           : {
               color_center_id: formData.color_center_id,
               tipo_equipo: formData.tipo_equipo,
               tipo_equipo_id: Number(catalogTipos.find((t) => t.nombre === formData.tipo_equipo)?.id),
-              marca_id: Number(formData.marca_id),
-              modelo_id: Number(formData.modelo_id),
+              ...(formData.marca_id ? { marca_id: Number(formData.marca_id) } : {}),
+              ...(formData.modelo_id ? { modelo_id: Number(formData.modelo_id) } : {}),
               numero_serie: isComputo ? null : formData.numero_serie || null,
               fecha_compra: isComputo ? null : formData.fecha_compra || null,
-              ...(showLeasing
-                ? {
-                    tipo_propiedad: formData.tipo_propiedad,
-                    arrendador: formData.tipo_propiedad === "Arrendado" ? arrendadorNombre : null,
-                    fecha_vencimiento_arrendamiento:
-                      formData.tipo_propiedad === "Arrendado" ? formData.fecha_vencimiento_arrendamiento || null : null,
-                  }
-                : {}),
+              ...(showLeasing ? leasingPayload : {}),
               estado: formData.estado,
               ultima_calibracion: isComputo ? null : formData.ultima_calibracion || null,
               proxima_revision: isComputo ? null : formData.proxima_revision || null,
@@ -389,10 +389,9 @@ export function EquipoForm({
         modelo_id: Number(formData.modelo_id),
         numero_serie: isComputo ? null : formData.numero_serie || null,
         fecha_compra: isComputo ? null : formData.fecha_compra || null,
-        tipo_propiedad: showLeasing ? formData.tipo_propiedad : "Propio",
-        arrendador: showLeasing && formData.tipo_propiedad === "Arrendado" ? arrendadorNombre : null,
-        fecha_vencimiento_arrendamiento:
-          showLeasing && formData.tipo_propiedad === "Arrendado" ? formData.fecha_vencimiento_arrendamiento || null : null,
+        ...(showLeasing
+          ? leasingPayload
+          : { tipo_propiedad: "Propio", arrendador: null, fecha_vencimiento_arrendamiento: null, numero_contrato: null }),
         estado: formData.estado,
         ultima_calibracion: isComputo ? null : formData.ultima_calibracion || null,
         proxima_revision: isComputo ? null : formData.proxima_revision || null,
@@ -597,27 +596,35 @@ export function EquipoForm({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Marca <span className="text-destructive">*</span></Label>
-              <CreatableCombobox
-                value={formData.marca_id}
-                onValueChange={(v) => setFormData({ ...formData, marca_id: v, modelo_id: "" })}
-                options={marcaOptions}
-                placeholder={!empresaId ? "Primero selecciona empresa" : !formData.tipo_equipo ? "Primero selecciona tipo" : catalogLoading ? "Cargando..." : "Selecciona marca..."}
-                searchPlaceholder="Buscar marca..."
-                disabled={isRestrictedEdit || !empresaId || !formData.tipo_equipo || catalogLoading}
-                emptyText="No hay marcas para el tipo seleccionado."
-              />
+              {isRestrictedEdit ? (
+                <Input value={equipo?.marca || "—"} disabled />
+              ) : (
+                <CreatableCombobox
+                  value={formData.marca_id}
+                  onValueChange={(v) => setFormData({ ...formData, marca_id: v, modelo_id: "" })}
+                  options={marcaOptions}
+                  placeholder={!empresaId ? "Primero selecciona empresa" : !formData.tipo_equipo ? "Primero selecciona tipo" : catalogLoading ? "Cargando..." : "Selecciona marca..."}
+                  searchPlaceholder="Buscar marca..."
+                  disabled={!empresaId || !formData.tipo_equipo || catalogLoading}
+                  emptyText="No hay marcas para el tipo seleccionado."
+                />
+              )}
             </div>
             <div className="space-y-2">
               <Label>Modelo <span className="text-destructive">*</span></Label>
-              <CreatableCombobox
-                value={formData.modelo_id}
-                onValueChange={(v) => setFormData({ ...formData, modelo_id: v })}
-                options={modeloOptions}
-                placeholder={!empresaId ? "Primero selecciona empresa" : !formData.marca_id ? "Primero selecciona marca" : "Selecciona modelo..."}
-                disabled={isRestrictedEdit || !empresaId || !formData.marca_id || catalogLoading}
-                searchPlaceholder="Buscar modelo..."
-                emptyText="No hay modelos para esta marca."
-              />
+              {isRestrictedEdit ? (
+                <Input value={equipo?.modelo || "—"} disabled />
+              ) : (
+                <CreatableCombobox
+                  value={formData.modelo_id}
+                  onValueChange={(v) => setFormData({ ...formData, modelo_id: v })}
+                  options={modeloOptions}
+                  placeholder={!empresaId ? "Primero selecciona empresa" : !formData.marca_id ? "Primero selecciona marca" : "Selecciona modelo..."}
+                  disabled={!empresaId || !formData.marca_id || catalogLoading}
+                  searchPlaceholder="Buscar modelo..."
+                  emptyText="No hay modelos para esta marca."
+                />
+              )}
             </div>
           </div>
           {/* Serie, Fecha compra, Propiedad: no se usan para Equipo de Computo */}
@@ -649,7 +656,13 @@ export function EquipoForm({
                     <Select
                       value={formData.tipo_propiedad}
                       onValueChange={(value: "Propio" | "Arrendado") =>
-                        setFormData({ ...formData, tipo_propiedad: value, arrendador_id: value === "Propio" ? "" : formData.arrendador_id })
+                        setFormData({
+                          ...formData,
+                          tipo_propiedad: value,
+                          arrendador_id: value === "Propio" ? "" : formData.arrendador_id,
+                          numero_contrato: value === "Propio" ? "" : formData.numero_contrato,
+                          fecha_vencimiento_arrendamiento: value === "Propio" ? "" : formData.fecha_vencimiento_arrendamiento,
+                        })
                       }
                       disabled={!equipo && formData.tipo_equipo === "Equipo de Computo"}
                     >
@@ -674,6 +687,15 @@ export function EquipoForm({
                           disabled={!empresaId || catalogLoading}
                           searchPlaceholder="Buscar arrendadora..."
                           emptyText="No hay arrendadoras con ese nombre."
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="numero_contrato">Número de contrato</Label>
+                        <Input
+                          id="numero_contrato"
+                          value={formData.numero_contrato}
+                          onChange={(e) => setFormData({ ...formData, numero_contrato: e.target.value })}
+                          placeholder="Ej: CTR-2024-015"
                         />
                       </div>
                       <div className="space-y-2">

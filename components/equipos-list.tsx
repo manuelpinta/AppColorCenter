@@ -104,6 +104,9 @@ export function EquiposList({ equipos, colorCenterId, canWrite, showLeasingInfo 
                         ? "En arrendamiento"
                         : "Propiedad nuestra"}
                   </span>
+                  {equipo.tipo_propiedad === "Arrendado" && equipo.numero_contrato && (
+                    <span className="ml-2 text-sm text-muted-foreground">({equipo.numero_contrato})</span>
+                  )}
                   {equipo.tipo_propiedad === "Arrendado" && equipo.fecha_vencimiento_arrendamiento && (
                     <span className="ml-2 text-sm text-muted-foreground">
                       (Vence: {new Date(equipo.fecha_vencimiento_arrendamiento).toLocaleDateString("es-ES")})
