@@ -29,11 +29,15 @@ const equipoAllowed = [
   "equipo_impresora_id",
 ] as const satisfies readonly (keyof EquipoPatchInput)[]
 
-const normatividadAllowed = [
-  "fecha_compra",
+const leasingFields = [
   "tipo_propiedad",
   "arrendador",
   "fecha_vencimiento_arrendamiento",
+] as const satisfies readonly (keyof EquipoPatchInput)[]
+
+const normatividadAllowed = [
+  "fecha_compra",
+  ...leasingFields,
 ] as const satisfies readonly (keyof EquipoPatchInput)[]
 
 export async function PATCH(
@@ -61,9 +65,15 @@ export async function PATCH(
   }
 
   const data: Record<string, unknown> = {}
-  const allowedFields = canWrite ? equipoAllowed : normatividadAllowed
-  for (const key of allowedFields) {
-    if (body[key] !== undefined) data[key] = body[key]
+  if (canWrite) {
+    for (const key of equipoAllowed) {
+      if (leasingFields.includes(key as (typeof leasingFields)[number]) && !canEditNormatividad) continue
+      if (body[key] !== undefined) data[key] = body[key]
+    }
+  } else if (canEditNormatividad) {
+    for (const key of normatividadAllowed) {
+      if (body[key] !== undefined) data[key] = body[key]
+    }
   }
 
   try {

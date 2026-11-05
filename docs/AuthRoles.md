@@ -7,6 +7,7 @@ Roles definidos (nombres EXACTOS):
 - `soporte`
 - `gerente-regional`
 - `soporte-central`
+- `normatividad`
 
 ---
 
@@ -18,9 +19,10 @@ La app lee los roles desde este claim (dentro de la sesión):
 - Formato esperado: arreglo de strings, por ejemplo: `["soporte","gerente-regional"]`
 
 Con esos roles, la app define:
-- `soporte` y `soporte-central` => tienen escritura
+- `soporte` y `soporte-central` => tienen escritura técnica (equipos, incidencias, mantenimientos)
 - `gerente-regional` => solo lectura
 - `soporte-central` => además actúa como admin para datos (escritura/lectura en todas las empresas configuradas)
+- `normatividad` => ve y edita solo si el equipo es **Propio** o **Arrendado** (arrendador y fecha de vencimiento). No ve esa información ningún otro rol. No puede crear equipos ni editar marca, modelo, estado, etc.
 
 ---
 
@@ -34,6 +36,7 @@ En tu tenant de Auth0:
    - `soporte`
    - `gerente-regional`
    - `soporte-central`
+   - `normatividad`
 
 2. **Asignar roles a usuarios**  
    Auth0 Dashboard → **User Management → Users → [usuario] → Roles**  
@@ -206,6 +209,9 @@ En `AppShell` / `sidebar`:
   - Ven botones de **Crear**, **Editar**, **Cerrar incidencia**, etc.
 - **Gerente Regional**
   - Solo ve **listados**; sin botones de edición/borrado.
+- **Normatividad**
+  - En Equipos ve propiedad (Propio / Arrendado), arrendador y vencimiento.
+  - Puede editar solo esos campos (y fecha de compra). El resto del formulario queda bloqueado.
 - **Menús de administración**
   - Por ejemplo, solo mostrar el menú de “Admin” si `roles` incluye `soporte-central`.
 
@@ -214,7 +220,7 @@ En `AppShell` / `sidebar`:
 ### 5. Resumen concreto
 
 - **En Auth0**
-  - Crear roles: `soporte`, `gerente-regional`, `soporte-central`.
+  - Crear roles: `soporte`, `gerente-regional`, `soporte-central`, `normatividad`.
   - Asignar roles a usuarios.
   - Crear una Action / Rule que ponga `event.authorization.roles` en el claim `https://colorcenter.app/roles`.
 

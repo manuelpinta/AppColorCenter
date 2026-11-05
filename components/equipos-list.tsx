@@ -12,7 +12,7 @@ interface EquiposListProps {
   showLeasingInfo?: boolean
 }
 
-export function EquiposList({ equipos, colorCenterId, canWrite, showLeasingInfo = true }: EquiposListProps) {
+export function EquiposList({ equipos, colorCenterId, canWrite, showLeasingInfo = false }: EquiposListProps) {
   const getEstadoBadge = (estado: string) => {
     switch (estado) {
       case "Operativo":
@@ -94,21 +94,23 @@ export function EquiposList({ equipos, colorCenterId, canWrite, showLeasingInfo 
                     <span className="ml-2 font-medium text-foreground">{equipo.numero_serie}</span>
                   </div>
                 )}
+                {showLeasingInfo && (
                 <div>
                   <span className="text-muted-foreground">Propiedad:</span>
                   <span className="ml-2 font-medium text-foreground">
-                    {showLeasingInfo
-                      ? equipo.tipo_propiedad === "Arrendado" && equipo.arrendador
-                        ? `Arrendado - ${equipo.arrendador}`
-                        : "Propio"
-                      : equipo.tipo_propiedad}
+                    {equipo.tipo_propiedad === "Arrendado" && equipo.arrendador
+                      ? `Arrendado - ${equipo.arrendador}`
+                      : equipo.tipo_propiedad === "Arrendado"
+                        ? "En arrendamiento"
+                        : "Propiedad nuestra"}
                   </span>
-                  {showLeasingInfo && equipo.tipo_propiedad === "Arrendado" && equipo.fecha_vencimiento_arrendamiento && (
+                  {equipo.tipo_propiedad === "Arrendado" && equipo.fecha_vencimiento_arrendamiento && (
                     <span className="ml-2 text-sm text-muted-foreground">
                       (Vence: {new Date(equipo.fecha_vencimiento_arrendamiento).toLocaleDateString("es-ES")})
                     </span>
                   )}
                 </div>
+                )}
                 {equipo.ultima_calibracion && (
                   <div className="flex items-center gap-2">
                     <Calendar className="h-4 w-4 text-muted-foreground" />

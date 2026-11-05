@@ -56,6 +56,7 @@ export default async function EditarEquipoPage({ params }: { params: Promise<{ i
           empresaId={empresaId}
           equipoIdForLink={id}
           normatividadMode={canEditNormatividadFields && !canWrite}
+          showLeasingFields={canEditNormatividadFields}
         />
       </div>
     </div>
